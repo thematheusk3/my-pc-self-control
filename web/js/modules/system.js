@@ -26,10 +26,18 @@ function mount(el, a) {
         <button class="btn" data-act="reboot">↻ Reiniciar</button>
         <button class="btn btn-danger" data-act="poweroff">⏻ Desligar</button>
       </div>
-      <label class="check" style="margin-top:12px"><input type="checkbox" data-force> Forçar finalização</label>
+      <label class="check" style="margin-top:12px"><input type="checkbox" data-force checked> Forçar finalização</label>
       <p class="note" style="margin-top:6px">Forçar ignora programas que estão bloqueando o desligamento (downloads, jogos, "deseja salvar?")
         e outros usuários logados. Arquivos não salvos podem ser perdidos.</p>
       <p class="note" data-power-warn hidden></p>
+      <div class="power-timer" data-timer>
+        <div class="stat-label" style="margin-top:14px">Timer</div>
+        <div data-timer-body></div>
+      </div>
+    </article>` : ""}
+    ${app.info.features.updates ? `<article class="card span-2" data-updates>
+      <div class="card-head"><div class="card-title">Atualizações pendentes</div><button class="btn btn-sm" data-upd-refresh>Verificar agora</button></div>
+      <div data-upd-body class="note" style="margin-top:0">Carregando…</div>
     </article>` : ""}</div>`;
   $("[data-pw]", el).addEventListener("submit", async e => {
     e.preventDefault();
@@ -47,6 +55,7 @@ function mount(el, a) {
     }
   });
   if (app.info.features.power) setupPower(el);
+  if (app.info.features.updates) setupUpdates(el);
   if (app.info.features.unlock) setupSession(el);
   app.onSnapshot(update);
 }
@@ -129,6 +138,7 @@ const POWER = {
 
 function setupPower(el) {
   const card = $("[data-power]", el);
+  setupTimer(card);
   app.api("/api/power").then(st => {
     if (st.poweroff !== "yes" && st.poweroff !== "unknown") {
       const w = $("[data-power-warn]", card);
@@ -140,6 +150,99 @@ function setupPower(el) {
     const b = e.target.closest("[data-act]");
     if (b) confirmPower(b.dataset.act, $("[data-force]", card).checked);
   });
+}
+
+// ---------- timer ----------
+let timerState = null, timerTick = null;
+
+async function refreshTimer() {
+  const box = $("[data-timer-body]", root);
+  if (!box) return;
+  try { timerState = (await app.api("/api/power/timer")).timer; } catch { return; }
+  renderTimer();
+}
+
+function renderTimer() {
+  const box = $("[data-timer-body]", root);
+  if (!box) return;
+  const t = timerState;
+  if (t) {
+    const left = Math.max(0, Math.round(t.at - Date.now() / 1000));
+    const hh = Math.floor(left / 3600), mm = Math.floor((left % 3600) / 60), ss = left % 60;
+    box.innerHTML = `<div class="timer-on"><div><div class="hero num" style="font-size:30px">${hh ? `${hh}:` : ""}${String(mm).padStart(hh ? 2 : 1, "0")}:${String(ss).padStart(2, "0")}</div>
+        <div class="muted">${t.action === "poweroff" ? "para desligar" : "para reiniciar"} às ${new Date(t.at * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · forçado</div></div>
+      <button class="btn" data-timer-cancel>Cancelar</button></div>`;
+  } else {
+    box.innerHTML = `<div class="timer-form">
+        <select class="search" data-timer-action><option value="poweroff">Desligar</option><option value="reboot">Reiniciar</option></select>
+        <span>em</span>
+        <select class="search" data-timer-min>${[15, 30, 45, 60, 90, 120, 180, 240].map(m => `<option value="${m}" ${m === 60 ? "selected" : ""}>${m < 60 ? `${m} min` : `${m / 60} h${m % 60 ? "30" : ""}`}</option>`).join("")}<option value="custom">outro…</option></select>
+        <button class="btn btn-primary" data-timer-start>Agendar</button></div>
+      <p class="note">O timer sempre força o desligamento: nada impede (programas abertos, downloads). Aparece um aviso na tela do PC ao agendar, 5 min e 1 min antes.</p>`;
+  }
+}
+
+function setupTimer(card) {
+  card.addEventListener("click", async e => {
+    if (e.target.closest("[data-timer-cancel]")) {
+      try { await app.api("/api/power/timer", { method: "POST", body: { cancel: true } }); toast("Timer cancelado."); }
+      catch (err) { toast(err.message, true); }
+      return refreshTimer();
+    }
+    if (!e.target.closest("[data-timer-start]")) return;
+    const action = $("[data-timer-action]", card).value;
+    let minutes = $("[data-timer-min]", card).value;
+    if (minutes === "custom") {
+      minutes = prompt("Daqui a quantos minutos?", "60");
+      if (!minutes) return;
+    }
+    try {
+      timerState = (await app.api("/api/power/timer", { method: "POST", body: { action, minutes: Number(minutes) } })).timer;
+      toast(`${action === "poweroff" ? "Desligamento" : "Reinício"} agendado.`);
+      renderTimer();
+    } catch (err) { toast(err.message, true); }
+  });
+}
+
+// ---------- atualizações ----------
+const SENS = { kernel: ["Kernel", "warning"], driver: ["Driver", "warning"], sistema: ["Sistema", ""] };
+
+function setupUpdates(el) {
+  const card = $("[data-updates]", el);
+  card.querySelector("[data-upd-refresh]").addEventListener("click", async e => {
+    e.target.disabled = true;
+    try { renderUpdates(await app.api("/api/updates/refresh", { method: "POST", body: {} })); } catch (err) { toast(err.message, true); }
+    pollUpdates();
+  });
+}
+
+let updTimer = null;
+async function pollUpdates() {
+  clearTimeout(updTimer);
+  let st;
+  try { st = await app.api("/api/updates"); } catch { return; }
+  renderUpdates(st);
+  if (st.running) updTimer = setTimeout(pollUpdates, 2000);
+}
+
+function renderUpdates(st) {
+  const card = $("[data-updates]", root);
+  if (!card) return;
+  card.querySelector("[data-upd-refresh]").disabled = st.running;
+  const body = $("[data-upd-body]", card);
+  if (st.count == null) { body.innerHTML = st.running ? "Verificando…" : "Ainda não verificado."; return; }
+  const by = {};
+  for (const i of st.items) (by[i.source] ||= []).push(i);
+  const sens = st.items.filter(i => i.sensitive);
+  body.innerHTML = `<p style="margin:0 0 8px">${st.count ? `<b>${st.count}</b> atualizações pendentes` : "Tudo atualizado ✔"}
+      · verificado ${new Date(st.checked * 1000).toLocaleString("pt-BR")}${st.running ? " · verificando…" : ""}</p>
+    ${sens.length ? `<p class="fan-alert warning" style="margin:0 0 8px">Inclui pacotes sensíveis (${esc(sens.map(i => i.name).join(", "))}).
+      Atualize <b>sentado na frente do PC</b> e reinicie em seguida.</p>` : ""}
+    ${Object.entries(by).map(([src, items]) => `<details ${items.length <= 10 ? "open" : ""}><summary class="stat-label" style="cursor:pointer;margin:6px 0">${esc(src)} (${items.length})</summary>
+      <table class="ptable upd"><tbody>${items.map(i => `<tr><td class="pname">${esc(i.name)} ${i.sensitive ? `<span class="chip ${SENS[i.sensitive][1]}">${SENS[i.sensitive][0]}</span>` : ""}</td>
+        <td class="muted mono">${esc(i.current || "")}</td><td class="mono">→ ${esc(i.new || "")}</td></tr>`).join("")}</tbody></table></details>`).join("")}
+    ${(st.errors || []).map(e => `<p class="muted">${esc(e)}</p>`).join("")}
+    <p class="note">O painel só mostra as atualizações; para instalar, use o terminal ou a loja de apps no PC.</p>`;
 }
 
 function confirmPower(action, force) {
@@ -204,6 +307,8 @@ export default {
   show: () => {
     if (app.snapshot) update(app.snapshot);
     if (app.info.features.unlock) { refreshSession(); sessTimer = setInterval(refreshSession, 5000); }
+    if (app.info.features.power) { refreshTimer(); timerTick = setInterval(() => (timerState ? renderTimer() : null), 1000); }
+    if (app.info.features.updates) pollUpdates();
   },
-  hide: () => { clearInterval(sessTimer); sessTimer = null; },
+  hide: () => { clearInterval(sessTimer); sessTimer = null; clearInterval(timerTick); timerTick = null; clearTimeout(updTimer); },
 };

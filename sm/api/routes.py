@@ -15,7 +15,9 @@ def info(req):
                      "exited": ctx.proctrack is not None,
                      "power": ctx.config.allow_power,
                      "netmon": ctx.netmon is not None,
-                     "unlock": ctx.config.allow_unlock, "launch": ctx.config.allow_launch},
+                     "unlock": ctx.config.allow_unlock, "launch": ctx.config.allow_launch,
+                     "screenshot": ctx.config.allow_screenshot, "control": ctx.config.allow_control,
+                     "alerts": ctx.alerts is not None, "updates": ctx.updates is not None},
         "sample_interval": ctx.config.sample_interval,
         "process_interval": ctx.config.process_interval,
         "info": ctx.info(),
@@ -286,3 +288,244 @@ def app_launch(req, aid):
         return APPS.launch(aid)
     except SessionError as e:
         return Response({"error": str(e)}, e.status)
+
+
+# ---------- jogo / FPS ----------
+@route("GET", "/api/game")
+def game_status(req):
+    if not req.ctx.game:
+        return Response({"error": "indisponível"}, 404)
+    return req.ctx.game.status()
+
+
+@route("POST", "/api/game")
+def game_set(req):
+    if not req.ctx.game:
+        return Response({"error": "indisponível"}, 404)
+    try:
+        return req.ctx.game.set_enabled(bool((req.json() or {}).get("fps_enabled")))
+    except RuntimeError as e:
+        return Response({"error": str(e)}, 500)
+
+
+# ---------- áudio ----------
+def _control_off(req):
+    return None if req.ctx.config.allow_control else Response(
+        {"error": "Controle de áudio/tela desativado na configuração (security.allow_control)."}, 403)
+
+
+@route("GET", "/api/audio")
+def audio_state(req):
+    from ..audio import AudioError, state
+    if (r := _control_off(req)):
+        return r
+    try:
+        return state()
+    except AudioError as e:
+        return Response({"error": str(e)}, e.status)
+
+
+@route("POST", "/api/audio")
+def audio_action(req):
+    from ..audio import AudioError, action
+    if (r := _control_off(req)):
+        return r
+    try:
+        return action(req.json() or {})
+    except (AudioError, KeyError, ValueError) as e:
+        return Response({"error": str(e) if isinstance(e, AudioError) else "Pedido inválido."},
+                        getattr(e, "status", 400))
+
+
+# ---------- tela ----------
+def _display(fn):
+    from ..display import DisplayError
+    try:
+        return fn()
+    except DisplayError as e:
+        return Response({"error": str(e)}, e.status)
+    except (KeyError, ValueError, TypeError):
+        return Response({"error": "Pedido inválido."}, 400)
+
+
+@route("GET", "/api/display")
+def display_state(req):
+    from .. import display
+    if (r := _control_off(req)):
+        return r
+    return _display(lambda: {"outputs": display.outputs(), "pending": display.MODES.status(),
+                             "revert_after": display.REVERT_AFTER})
+
+
+@route("GET", "/api/display/ddc")
+def display_ddc(req):
+    from .. import display
+    if (r := _control_off(req)):
+        return r
+    refresh = req.query.get("refresh", ["0"])[0] == "1"
+    return _display(lambda: {"monitors": display.ddc_monitors(refresh=refresh)})
+
+
+@route("POST", "/api/display/ddc")
+def display_ddc_set(req):
+    from .. import display
+    if (r := _control_off(req)):
+        return r
+    b = req.json() or {}
+    bus = int(b.get("bus", -1))
+    op = b.get("op", "set")
+    if op == "dim":
+        return _display(lambda: {"monitors": display.dim(bus)})
+    if op == "restore":
+        return _display(lambda: {"monitors": display.restore(bus)})
+    return _display(lambda: {"monitors": display.set_vcp(bus, b.get("brightness"), b.get("contrast"))})
+
+
+@route("POST", "/api/display/mode")
+def display_mode(req):
+    from .. import display
+    if (r := _control_off(req)):
+        return r
+    b = req.json() or {}
+    op = b.get("op", "apply")
+    if op == "confirm":
+        display.MODES.confirm()
+        return {"ok": True}
+    if op == "revert":
+        return _display(lambda: (display.MODES.revert(), {"ok": True})[1])
+    return _display(lambda: {"pending": display.MODES.apply(str(b.get("output")), str(b.get("mode")))})
+
+
+@route("POST", "/api/display/dpms")
+def display_dpms(req):
+    from .. import display
+    if (r := _control_off(req)):
+        return r
+    on = bool((req.json() or {}).get("on"))
+    return _display(lambda: (display.dpms(on), {"ok": True})[1])
+
+
+# ---------- timer de energia ----------
+@route("GET", "/api/power/timer")
+def power_timer(req):
+    if not req.ctx.power_timer:
+        return Response({"error": "Desativado na configuração (security.allow_power)."}, 403)
+    return {"timer": req.ctx.power_timer.status()}
+
+
+@route("POST", "/api/power/timer")
+def power_timer_set(req):
+    from ..power import PowerError
+    t = req.ctx.power_timer
+    if not t:
+        return Response({"error": "Desativado na configuração (security.allow_power)."}, 403)
+    b = req.json() or {}
+    if b.get("cancel"):
+        t.cancel()
+        return {"timer": None}
+    try:
+        return {"timer": t.schedule(str(b.get("action", "poweroff")), b.get("minutes"))}
+    except PowerError as e:
+        return Response({"error": str(e)}, e.status)
+
+
+# ---------- atualizações ----------
+@route("GET", "/api/updates")
+def updates_status(req):
+    return req.ctx.updates.status() if req.ctx.updates else Response({"error": "indisponível"}, 404)
+
+
+@route("POST", "/api/updates/refresh")
+def updates_refresh(req):
+    if not req.ctx.updates:
+        return Response({"error": "indisponível"}, 404)
+    req.ctx.updates.refresh()
+    return req.ctx.updates.status()
+
+
+# ---------- alertas ----------
+@route("GET", "/api/alerts")
+def alerts_list(req):
+    return req.ctx.alerts.list()
+
+
+@route("POST", "/api/alerts/read")
+def alerts_read(req):
+    req.ctx.alerts.mark_read()
+    return {"ok": True}
+
+
+@route("POST", "/api/alerts/clear")
+def alerts_clear(req):
+    req.ctx.alerts.clear()
+    return {"ok": True}
+
+
+@route("GET", "/api/alerts/config")
+def alerts_config(req):
+    return req.ctx.alerts.config()
+
+
+@route("POST", "/api/alerts/config")
+def alerts_config_set(req):
+    try:
+        return req.ctx.alerts.update_config(req.json() or {})
+    except ValueError as e:
+        return Response({"error": str(e)}, 400)
+
+
+@route("POST", "/api/alerts/test")
+def alerts_test(req):
+    """Envia uma mensagem de teste pelos canais configurados (PC e ntfy)."""
+    from ..desktop import notify_pc
+    a = req.ctx.alerts
+    ch = a.config()["channels"]
+    res = {}
+    if ch["pc"]:
+        res["pc"] = notify_pc("⚠ Teste de alerta", "Os alertas do self-monitoring vão aparecer assim.")
+    if ch["ntfy"]:
+        err = a.send_ntfy(ch["ntfy"], "Teste de alerta", "Os alertas do self-monitoring vão chegar assim.")
+        res["ntfy"] = err is None
+        if err:
+            res["ntfy_error"] = err
+    return res
+
+
+# ---------- captura de tela ----------
+@route("POST", "/api/screenshot")
+def screenshot_take(req):
+    from ..screenshot import ShotError, take
+    if not req.ctx.config.allow_screenshot:
+        return Response({"error": "Captura de tela desativada (security.allow_screenshot)."}, 403)
+    try:
+        return take(req.client_address[0])
+    except ShotError as e:
+        return Response({"error": str(e)}, e.status)
+
+
+@route("GET", "/api/screenshots")
+def screenshots(req):
+    from ..screenshot import list_shots
+    if not req.ctx.config.allow_screenshot:
+        return Response({"error": "Captura de tela desativada (security.allow_screenshot)."}, 403)
+    return {"shots": list_shots()}
+
+
+@route("GET", "/api/screenshots/<name>")
+def screenshot_file(req, name):
+    from ..screenshot import path_of
+    if not req.ctx.config.allow_screenshot:
+        return Response({"error": "desativado"}, 403)
+    p = path_of(name)
+    if not p:
+        return Response({"error": "não encontrada"}, 404)
+    hdr = {"Content-Type": "image/png", "Cache-Control": "private, max-age=3600"}
+    if req.query.get("download"):
+        hdr["Content-Disposition"] = f'attachment; filename="{p.name}"'
+    return Response(p.read_bytes(), 200, hdr)
+
+
+@route("POST", "/api/screenshots/<name>/delete")
+def screenshot_delete(req, name):
+    from ..screenshot import delete
+    return {"ok": delete(name)}

@@ -1,4 +1,4 @@
-import { $, bytes, esc, h, meter, mhz, pct, rate, tempChip } from "../ui.js";
+import { $, bytes, esc, h, meter, mhz, pct, rate, tempChip, toast } from "../ui.js";
 import { Spark } from "../spark.js";
 import { openProcessSheet } from "../procsheet.js";
 
@@ -16,6 +16,7 @@ function mount(el, a) {
   el.innerHTML = `<div class="grid">
     ${card("ov-cpu", "CPU")}
     ${gpus.map((g, i) => card(`ov-gpu-${i}`, gpus.length > 1 ? `GPU ${i + 1}` : "GPU")).join("")}
+    ${card("ov-game", "Jogo")}
     ${card("ov-mem", "Memória")}
     ${card("ov-top", "Maiores consumidores")}
     ${card("ov-net", "Rede")}
@@ -36,6 +37,21 @@ function mount(el, a) {
       <div class="spark" data-spark="gpu${i}"></div>
       <div data-meters></div><div class="stats" data-stats></div><div class="note" data-note></div>`;
     sparks[`gpu${i}`] = new Spark($(`[data-spark=gpu${i}]`, el), { series: [{ key: `gpu.${i}.busy` }], min: 0, max: 100, format: v => pct(v, 1) });
+  });
+
+  // jogo / FPS
+  const gm = $("#ov-game", el);
+  $("[data-chip]", gm).innerHTML = `<label class="check" title="Ler o FPS dos jogos pelo MangoHud"><input type="checkbox" data-fps> FPS</label>`;
+  $("[data-body]", gm).innerHTML = `<div data-game></div><div class="spark" data-spark="fps" hidden></div><div class="note" data-game-note></div>`;
+  sparks.fps = new Spark($("[data-spark=fps]", el), { series: [{ key: "game.fps", color: "--series-2" }], min: 0, format: v => `${Math.round(v)} FPS` });
+  $("[data-fps]", gm).addEventListener("change", async e => {
+    const on = e.target.checked;
+    e.target.disabled = true;
+    try {
+      await app.api("/api/game", { method: "POST", body: { fps_enabled: on } });
+      toast(on ? "Leitura de FPS ativada. Vale para jogos abertos com o MangoHud." : "Leitura de FPS desativada.");
+    } catch (err) { toast(err.message, true); e.target.checked = !on; }
+    e.target.disabled = false;
   });
 
   $("#ov-mem [data-body]", el).innerHTML = `
@@ -128,6 +144,37 @@ function update(snap) {
     $("[data-stats]", el).innerHTML = st;
     $("[data-note]", el).textContent = [...(g.notes || []), g.busy_source === "fdinfo" ? "Uso estimado pelos processos visíveis." : ""].filter(Boolean).join(" ");
   });
+
+  // Jogo
+  const g = d.game;
+  if (g) {
+    const el = $("#ov-game", root);
+    const cb = $("[data-fps]", el);
+    if (!cb.disabled) cb.checked = g.enabled;
+    const name = g.game?.name;
+    $("[data-sub]", el).textContent = name ? name : "Nenhum jogo aberto";
+    const sp = $("[data-spark=fps]", el);
+    sp.hidden = !(g.enabled && g.live);
+    let body = "", note = "";
+    if (g.enabled && g.live) {
+      body = `<div class="hero-row"><div class="hero num">${g.fps != null ? Math.round(g.fps) : "—"}<small>FPS</small></div></div>
+        <div class="stats">${stat("1% low", g.low1 != null ? `${Math.round(g.low1)} FPS` : "—")}${stat("Frametime", g.frametime != null ? `${g.frametime.toFixed(1)} ms` : "—")}
+        ${g.gpu_load != null ? stat("GPU", pct(g.gpu_load)) : ""}${g.cpu_load != null ? stat("CPU", pct(g.cpu_load)) : ""}</div>`;
+      note = "Medido pelo MangoHud dentro do jogo. 1% low aproximado (últimos 60 s).";
+    } else if (name) {
+      body = `<div class="hero-row"><div class="hero" style="font-size:22px">${esc(name)}</div></div>`;
+      note = g.enabled
+        ? `Sem leitura de FPS: abra o jogo com o MangoHud (Steam → Propriedades → Opções de inicialização: <code>mangohud %command%</code>).`
+        : `Ative "FPS" para ver os quadros por segundo (precisa do MangoHud).`;
+    } else {
+      body = `<p class="muted" style="margin:4px 0">Nenhum jogo rodando.</p>`;
+      note = g.enabled ? "A leitura de FPS está ligada e começa quando um jogo abrir com o MangoHud."
+        : "Leitura de FPS desligada (não gasta nada). Ative em \"FPS\" acima.";
+    }
+    if (g.enabled && g.config_ok === false) note += ` ⚠ O MangoHud.conf foi alterado por outro programa (ex.: Goverlay); desative e ative de novo.`;
+    $("[data-game]", el).innerHTML = body;
+    $("[data-game-note]", el).innerHTML = note;
+  }
 
   // Memória
   const mm = d.memory;

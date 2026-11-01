@@ -80,6 +80,15 @@ def main() -> None:
         from sm.netmon import NetMonitor
         ctx.netmon = NetMonitor(ctx)
         ctx.netmon.start()
+    from sm.alerts import Alerts
+    from sm.game import GameMonitor
+    from sm.power import PowerTimer
+    from sm.updates import Updates
+    ctx.game = GameMonitor(ctx)
+    ctx.updates = Updates()
+    ctx.power_timer = PowerTimer() if cfg.allow_power else None
+    ctx.alerts = Alerts(ctx)
+    ctx.alerts.start()
     Sampler(ctx).start()
     srv = make_server(ctx)
 

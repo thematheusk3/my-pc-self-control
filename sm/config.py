@@ -22,6 +22,8 @@ class Config:
     allow_power: bool = True             # desligar/reiniciar pelo painel
     allow_unlock: bool = True            # bloquear/desbloquear a sessão gráfica pelo painel
     allow_launch: bool = True            # abrir aplicativos instalados pelo painel
+    allow_screenshot: bool = True        # captura de tela (sempre avisa na tela do PC)
+    allow_control: bool = True           # áudio e tela (volume, saída, resolução, brilho)
     disabled_collectors: list[str] = field(default_factory=list)
     # histórico de processos
     track_exited: bool = True
@@ -67,6 +69,8 @@ def load(path: Path | None = None) -> Config:
         allow_power=bool(security.get("allow_power", True)),
         allow_unlock=bool(security.get("allow_unlock", True)),
         allow_launch=bool(security.get("allow_launch", True)),
+        allow_screenshot=bool(security.get("allow_screenshot", True)),
+        allow_control=bool(security.get("allow_control", True)),
         disabled_collectors=list(collectors.get("disabled", [])),
         track_exited=bool(sampling.get("track_exited", True)),
         track_interval=max(0.2, float(sampling.get("track_interval", Config.track_interval))),

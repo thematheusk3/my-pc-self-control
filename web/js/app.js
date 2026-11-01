@@ -33,11 +33,29 @@ export const app = {
       if (!arr.length || arr.at(-1)[0] < t) arr.push([t, v]);
       while (arr.length && arr[0][0] < cut) arr.shift();
     }
+    updateBell(snap.data.alerts);
     for (const fn of this.listeners) {
       try { fn(snap); } catch (e) { console.error(e); }
     }
   },
 };
+
+// sino de alertas: contador + notificação do navegador (se permitida) para alertas novos
+let lastAlertSeq = null;
+function updateBell(al) {
+  const bell = $("#bell");
+  if (!al) return;
+  bell.hidden = false;
+  const badge = bell.querySelector(".badge");
+  badge.hidden = !al.unread;
+  badge.textContent = al.unread > 99 ? "99+" : al.unread;
+  const seq = al.latest?.seq ?? 0;
+  if (lastAlertSeq !== null && seq > lastAlertSeq && al.latest && !al.latest.read &&
+      "Notification" in window && Notification.permission === "granted") {
+    try { new Notification(al.latest.title, { body: al.latest.text, tag: `alert-${seq}` }); } catch { /* */ }
+  }
+  lastAlertSeq = seq;
+}
 
 function setLive(state) {
   const el = $("#live");

@@ -22,6 +22,8 @@ allow_kill = true   # permite finalizar processos pelo painel
 allow_power = true  # permite desligar/reiniciar a máquina pelo painel
 allow_unlock = true # permite bloquear/desbloquear a sessão (tela de bloqueio) pelo painel
 allow_launch = true # permite abrir aplicativos instalados pelo painel
+allow_screenshot = true # captura de tela pelo painel (sempre mostra um aviso na tela do PC)
+allow_control = true    # controle de áudio e tela (saída, volume, microfone, resolução, brilho)
 # senha: defina com  python3 server.py --set-password  (fica em data/auth.json, só o hash)
 
 [collectors]

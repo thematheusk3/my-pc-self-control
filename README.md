@@ -15,6 +15,10 @@ Funciona em PCs comuns (AMD, Intel, NVIDIA) e tem tratamento específico para a 
   - **Suspeitos**: processos vivos ou encerrados com sinais comuns em malware.
   - **Analisar**: o que é o processo (pacote e descrição), executável, SHA-256 + link do VirusTotal,
     cadeia de processos pais, serviço systemd, portas e conexões, LD_PRELOAD.
+- **Controles**: áudio (saída fone/HDMI, volume, por aplicativo, microfone), tela (resolução, brilho,
+  apagar/espera) e captura de tela (sempre com aviso no PC).
+- **Alertas**: regras configuráveis com aviso no painel, na tela do PC e no celular (ntfy).
+- **Jogo/FPS** (na Visão geral): jogo aberto e FPS via MangoHud.
 - **Apps**: abre pelo celular, na tela do PC, os aplicativos e jogos instalados.
 - **Rede**: conexões por programa (para onde, quanto envia/recebe), conexões encerradas e portas abertas.
 - **Sensores**: todos os sensores hwmon (temperaturas, ventoinhas, tensões), agrupados por chip.
@@ -149,12 +153,61 @@ costuma ser também a do `sudo`. O desbloqueio tem o mesmo limite de tentativas 
 Efeito colateral: sem digitar a senha no login, o **KWallet** não abre sozinho; programas que guardam senhas
 nele vão pedir a senha da carteira na primeira vez. Desative com `security.allow_unlock = false`.
 
+## FPS dos jogos
+
+O Linux não tem um contador de FPS global; quem mede é o **MangoHud** dentro do jogo. Ligando "FPS" no
+cartão **Jogo** (Visão geral), o painel acrescenta `autostart_log=1` ao `~/.config/MangoHud/MangoHud.conf`
+num bloco marcado (removido ao desligar, deixando o arquivo como estava). O MangoHud passa a gravar um CSV
+enquanto o jogo roda e o painel lê o final dele a cada segundo: FPS, 1% low (aprox., últimos 60 s), frametime,
+uso de CPU/GPU. O jogo precisa rodar com o MangoHud (Steam: `mangohud %command%` nas opções de inicialização).
+Desligado, nada é lido nem gravado. Jogos da Steam abertos aparecem mesmo sem MangoHud (sem FPS).
+Se o Goverlay regravar o MangoHud.conf, desligue e ligue de novo.
+
+## Áudio e tela
+
+**Áudio** (via `pactl`, PipeWire ou PulseAudio): saída padrão (tocar numa saída leva os apps junto),
+volume/mudo de cada saída, volume/mudo/saída **de cada aplicativo**, microfone (mudo, volume, entrada padrão)
+e quais apps estão usando o microfone.
+
+**Tela** (KDE): resolução e taxa de atualização via `kscreen-doctor`. Toda mudança precisa ser confirmada
+em 20 s; sem confirmação volta ao modo anterior (proteção contra tela preta). **Brilho/contraste** via DDC/CI
+(`ddcutil`, o monitor precisa ter DDC/CI ligado no menu). **Apagar tela** põe brilho e contraste em 0: a tela
+fica praticamente preta mas o monitor continua ligado e conectado (ao contrário de desligar no botão, que em
+DisplayPort faz o PC "perder" o monitor); **Restaurar** volta aos valores salvos. **Espera** (DPMS) também
+existe, com o aviso de que alguns monitores DisplayPort se desconectam em espera profunda.
+O `install.sh` adiciona o usuário ao grupo `i2c` para o DDC funcionar mesmo sem sessão aberta.
+
+## Captura de tela
+
+*Controles > Captura de tela*. **Toda captura mostra antes uma notificação crítica na tela do PC**
+("📸 Captura de tela pelo painel", com o IP de quem pediu), que aparece mesmo no modo não perturbe.
+Se a notificação não puder ser exibida, a captura é recusada. Usa o Spectacle (KDE/Wayland).
+As últimas 30 capturas ficam em `data/screenshots/` (só o usuário do serviço lê). Desative com
+`security.allow_screenshot = false`.
+
+## Alertas
+
+Aba **Alertas** (e o sino no topo). Cada regra pode ser ligada/desligada e as de limite têm valor ajustável:
+temperatura da CPU/GPU (sustentada por 30 s), disco quase cheio, memória, ventoinha parada, processo suspeito
+novo, porta nova aberta para a rede, login no painel, IP bloqueado por senha errada, atualizações, FPS baixo.
+A mesma condição não repete por 30 min. Canais: o painel (sempre; notificação do navegador só em HTTPS/localhost),
+a **tela do PC** e **push no celular via ntfy** (app gratuito; use um tópico com nome longo e aleatório,
+pois no ntfy.sh público quem souber o nome lê as mensagens). Há um botão de teste.
+
+## Atualizações
+
+*Sistema > Atualizações pendentes*: `checkupdates` + AUR (`paru`/`yay -Qua`) + Flatpak no Arch,
+`apt`/`dnf` em outras distros. Verifica sozinho a cada 6 h. Kernel, drivers DKMS e pacotes de sistema
+(mesa, systemd, gerenciador de login...) aparecem destacados. **O painel não instala atualizações**.
+
 ## Desligar / reiniciar
 
-Aba **Sistema > Energia**. Pede confirmação. **Forçar finalização** ignora programas que estão bloqueando o desligamento
+Aba **Sistema > Energia**. Pede confirmação. **Forçar finalização** (marcado por padrão) ignora programas que estão bloqueando o desligamento
 (inibidores do systemd: downloads, jogos, diálogos de "salvar?") e outros usuários logados; os programas recebem SIGTERM e,
 se não fecharem, SIGKILL. O serviço não roda numa sessão gráfica, então o `install.sh` instala uma regra do polkit
 (`/etc/polkit-1/rules.d/50-self-monitoring.rules`) que libera só desligar/reiniciar para o usuário do serviço.
+**Timer**: desligar ou reiniciar daqui a X minutos, sempre forçado (nada impede). Avisa na tela do PC
+ao agendar, 5 min e 1 min antes; pode ser cancelado. Sobrevive a reinícios do serviço.
 Desative com `security.allow_power = false`.
 
 ## Controle da ventoinha
@@ -213,7 +266,13 @@ sm/
   procinspect.py          análise de processo, pacote dono, hash, heurísticas de suspeita
   netmon.py               monitor de conexões de rede (ss), DNS reverso, histórico
   power.py                desligar/reiniciar via systemd-logind
-  desktop.py              sessão gráfica (bloquear/desbloquear) e aplicativos (listar, ícones, abrir)
+  desktop.py              sessão gráfica (bloquear/desbloquear), apps, ambiente da sessão, notificação no PC
+  audio.py                saídas/entradas/apps de áudio (pactl)
+  display.py              resolução (kscreen-doctor) com reversão, brilho DDC/CI, DPMS
+  game.py                 jogo atual e FPS (logs do MangoHud)
+  alerts.py               regras de alerta, histórico e canais (PC, ntfy)
+  screenshot.py           captura de tela com aviso obrigatório no PC
+  updates.py              atualizações pendentes
 tools/login-pelo-celular.sh  liga/desliga o login automático com a sessão bloqueada
 tools/simular-suspeito.sh processos inofensivos que imitam malware (para testar a aba Suspeitos)
   auth.py                 senha (hash scrypt), sessões e limite de tentativas
@@ -283,6 +342,17 @@ e adicione em `web/js/modules/index.js`. Use `app.onSnapshot(fn)` para receber d
 | GET | `/api/apps` | aplicativos instalados |
 | GET | `/api/apps/<id>/icon` | ícone do aplicativo |
 | POST | `/api/apps/<id>/launch` | abre o aplicativo na sessão do usuário |
+| GET/POST | `/api/game` | jogo atual e FPS; `{"fps_enabled": true}` liga a leitura |
+| GET/POST | `/api/audio` | estado do áudio; `{"op": "set_default"\|"volume"\|"mute"\|"move", ...}` |
+| GET | `/api/display` | monitores e modos |
+| POST | `/api/display/mode` | `{"output","mode"}` aplica (reverte em 20 s); `{"op":"confirm"\|"revert"}` |
+| GET/POST | `/api/display/ddc` | brilho/contraste; `{"bus", "brightness"/"contrast"}` ou `{"bus","op":"dim"\|"restore"}` |
+| POST | `/api/display/dpms` | `{"on": false}` põe o monitor em espera |
+| GET/POST | `/api/power/timer` | `{"action":"poweroff","minutes":60}` agenda (forçado); `{"cancel":true}` |
+| GET | `/api/updates` | atualizações pendentes; `POST /api/updates/refresh` verifica agora |
+| GET | `/api/alerts` | histórico; `POST /api/alerts/read`, `/api/alerts/clear`, `/api/alerts/test` |
+| GET/POST | `/api/alerts/config` | regras e canais |
+| POST | `/api/screenshot` | captura (avisa na tela do PC); `GET /api/screenshots`, `/api/screenshots/<nome>` |
 | GET | `/api/fan` | estado da ventoinha (modo, RPM, %, temperatura, curva) |
 | POST | `/api/fan` | `{"mode": "auto"\|"manual"\|"firmware", "manual_pct": 40, "curve": [[50,25],...], "preset": "silencioso"}` |
 

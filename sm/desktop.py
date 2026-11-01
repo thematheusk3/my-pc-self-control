@@ -40,6 +40,47 @@ def user_env() -> dict:
     return {**os.environ, "XDG_RUNTIME_DIR": RUNTIME, "DBUS_SESSION_BUS_ADDRESS": f"unix:path={RUNTIME}/bus"}
 
 
+_SESSION_ENV: tuple[float, dict] | None = None
+SESSION_KEYS = ("WAYLAND_DISPLAY", "DISPLAY", "XAUTHORITY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP",
+                "XDG_SESSION_DESKTOP", "XDG_DATA_DIRS", "QT_QPA_PLATFORM", "KDE_FULL_SESSION", "KDE_SESSION_VERSION",
+                "DESKTOP_SESSION", "LANG", "LANGUAGE")
+
+
+def session_env() -> dict:
+    """user_env() + variáveis da sessão gráfica (WAYLAND_DISPLAY etc.) exportadas ao systemd --user.
+    Necessário para falar com o PipeWire, o KScreen, notificações e o Spectacle."""
+    global _SESSION_ENV
+    if _SESSION_ENV and time.time() - _SESSION_ENV[0] < 30:
+        return dict(_SESSION_ENV[1])
+    env = user_env()
+    try:
+        for line in _run(["systemctl", "--user", "show-environment"], env=env, timeout=5).stdout.splitlines():
+            k, _, v = line.partition("=")
+            if k in SESSION_KEYS:
+                env[k] = v
+    except (OSError, subprocess.SubprocessError):
+        pass
+    _SESSION_ENV = (time.time(), env)
+    return dict(env)
+
+
+def run_in_session(cmd: list[str], timeout: float = 10) -> subprocess.CompletedProcess:
+    return _run(cmd, timeout=timeout, env=session_env())
+
+
+def notify_pc(title: str, body: str, urgency: str = "normal", icon: str = "dialog-information",
+              timeout_ms: int = 10000) -> bool:
+    """Notificação na tela do PC (notify-send). Retorna False se não foi possível exibir."""
+    if not shutil.which("notify-send"):
+        return False
+    try:
+        r = run_in_session(["notify-send", "-a", "self-monitoring", "-u", urgency, "-i", icon,
+                            "-t", str(timeout_ms), title, body], timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0
+
+
 # ---------- sessão ----------
 def graphical_session() -> dict | None:
     """Sessão gráfica (wayland/x11) do usuário do serviço, se existir."""

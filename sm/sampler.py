@@ -30,6 +30,10 @@ class Context:
         self.fan = None   # FanController, se ativo
         self.proctrack = None   # ProcessTracker, se ativo
         self.netmon = None      # NetMonitor, se ativo
+        self.game = None        # GameMonitor (jogo atual / FPS)
+        self.alerts = None      # Alerts
+        self.updates = None     # Updates
+        self.power_timer = None # PowerTimer
 
     def snapshot(self) -> dict:
         return {"ts": self.ts, "seq": self.seq, "series": dict(self.history.latest), "data": self.data}

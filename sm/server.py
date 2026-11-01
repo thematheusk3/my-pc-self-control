@@ -152,8 +152,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.auth.check_password(pw):
             self.auth.clear_fails(ip)
             sid = self.auth.create_session(ip, self.headers.get("User-Agent", ""))
+            if self.ctx.alerts:
+                self.ctx.alerts.event("panel_login", f"Login no painel a partir de {ip} ({_device(self.headers.get('User-Agent', ''))}).",
+                                      "info", key=sid)
             return self._redirect("/", self._session_cookie(sid))
         self.auth.register_fail(ip)
+        if self.ctx.alerts and self.auth.locked_for(ip):
+            self.ctx.alerts.event("login_fail", f"O IP {ip} errou a senha do painel várias vezes e foi bloqueado.",
+                                  "critical", key=ip)
         time.sleep(1)  # desacelera força bruta
         self._redirect("/login?erro=1")
 
@@ -235,6 +241,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
+
+
+def _device(ua: str) -> str:
+    """Resumo do User-Agent: 'Android · Chrome', 'Linux · Firefox'..."""
+    os_ = next((n for k, n in (("Android", "Android"), ("iPhone", "iPhone"), ("iPad", "iPad"), ("Windows", "Windows"),
+                               ("Mac OS", "Mac"), ("Linux", "Linux")) if k in ua), "dispositivo")
+    br = next((n for k, n in (("Firefox", "Firefox"), ("Edg/", "Edge"), ("Chrome", "Chrome"), ("Safari", "Safari")) if k in ua), "navegador")
+    return f"{os_} · {br}"
 
 
 class Server(ThreadingHTTPServer):

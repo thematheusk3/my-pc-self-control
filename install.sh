@@ -94,6 +94,10 @@ if [[ $SERVICE -eq 1 ]]; then
     sed "s|@USER@|$RUN_AS|" "$DEST/deploy/50-self-monitoring.rules" > /etc/polkit-1/rules.d/50-self-monitoring.rules
     chmod 644 /etc/polkit-1/rules.d/50-self-monitoring.rules
   fi
+  # brilho/contraste do monitor (DDC/CI): acesso ao barramento i2c mesmo sem sessão aberta
+  if [[ "$RUN_AS" != root ]] && getent group i2c >/dev/null && ! id -nG "$RUN_AS" | grep -qw i2c; then
+    usermod -aG i2c "$RUN_AS" && echo "Usuário $RUN_AS adicionado ao grupo i2c (controle de brilho do monitor)."
+  fi
   sed -e "s|@USER@|$RUN_AS|" -e "s|@DIR@|$DEST|g" "$DEST/deploy/self-monitoring.service" > /etc/systemd/system/self-monitoring.service
   systemctl daemon-reload
   systemctl enable self-monitoring.service >/dev/null 2>&1
