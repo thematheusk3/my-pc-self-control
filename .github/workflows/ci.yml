@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Dependências
+        run: pip install psutil
+      - name: Compila todo o Python
+        run: python -m compileall -q server.py sm tests
+      - name: Testes
+        run: python -m unittest discover -s tests -t . -v
+      - name: Sintaxe do JavaScript (módulos ES)
+        run: |
+          for f in $(find web/js -name '*.js'); do
+            cp "$f" /tmp/check.mjs && node --check /tmp/check.mjs || { echo "erro em $f"; exit 1; }
+          done
+      - name: Sintaxe dos scripts shell
+        run: for f in install.sh deploy/*.sh tools/*.sh; do bash -n "$f"; done

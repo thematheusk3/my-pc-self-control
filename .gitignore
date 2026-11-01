@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+# dados da máquina: senha (hash), sessões, históricos
+data/
+# configuração da máquina (o modelo versionado é config.example.toml)
+config.toml
+*.tmp
+watch_*

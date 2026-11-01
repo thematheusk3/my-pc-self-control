@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121211">
+<title>Entrar · Self Monitoring</title>
+<link rel="icon" href="/icon.svg">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="login-page">
+  <form class="login-card" method="post" action="/login">
+    <img src="/icon.svg" alt="" width="48" height="48">
+    <h1>Self Monitoring</h1>
+    <p class="muted">Digite sua senha para acessar o painel.</p>
+    <input name="password" type="password" autocomplete="current-password" placeholder="Senha" required autofocus>
+    <p class="login-error" hidden></p>
+    <button class="btn btn-primary" type="submit">Entrar</button>
+  </form>
+  <script>
+    const q = new URLSearchParams(location.search), err = document.querySelector(".login-error");
+    if (q.has("erro")) { err.hidden = false; err.textContent = "Senha incorreta."; }
+    if (q.has("bloqueado")) { err.hidden = false; err.textContent = `Muitas tentativas erradas. Aguarde ${q.get("bloqueado")}s.`; }
+  </script>
+</body>
+</html>

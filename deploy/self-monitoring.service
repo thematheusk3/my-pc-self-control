@@ -1,0 +1,20 @@
+[Unit]
+Description=self-monitoring - painel de monitoramento da máquina
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@DIR@
+# "+" = roda como root: permissão para o painel controlar a ventoinha (pwm* do hwmon)
+ExecStartPre=+/usr/local/lib/self-monitoring/fan-helper grant @USER@
+ExecStart=/usr/bin/python3 @DIR@/server.py
+# se o processo morreu sem devolver a ventoinha à placa, devolve aqui
+ExecStopPost=+/usr/local/lib/self-monitoring/fan-helper release @DIR@/data
+Restart=on-failure
+RestartSec=3
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

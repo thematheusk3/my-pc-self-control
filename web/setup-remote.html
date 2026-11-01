@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121211">
+<title>Senha não cadastrada · Self Monitoring</title>
+<link rel="icon" href="/icon.svg">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <img src="/icon.svg" alt="" width="48" height="48">
+    <h1>Senha não cadastrada</h1>
+    <p class="muted">Por segurança, a primeira senha só pode ser criada na própria máquina. Faça uma destas opções nela:</p>
+    <p style="text-align:left">1. Abra <code>http://localhost:8765</code> no navegador, ou<br>
+      2. No terminal: <code>python3 /opt/applications/self-monitoring/server.py --set-password</code></p>
+    <button class="btn" onclick="location.reload()">Já cadastrei, recarregar</button>
+  </div>
+</body>
+</html>

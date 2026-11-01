@@ -1,0 +1,43 @@
+# Configuração do self-monitoring. Todos os campos são opcionais.
+
+[server]
+host = "0.0.0.0"   # 0.0.0.0 = acessível na rede local; 127.0.0.1 = só esta máquina
+port = 8765
+
+[sampling]
+interval = 1.0          # segundos entre amostras (CPU, GPU, sensores...)
+process_interval = 2.0  # segundos entre varreduras da lista de processos
+history_seconds = 300   # histórico mantido para os gráficos
+track_exited = true     # registra processos que já encerraram (aba Processos > Encerrados)
+track_interval = 0.5    # s entre varreduras; processos mais curtos que isso podem não aparecer
+exited_max = 3000       # quantos processos encerrados guardar
+track_persist = true    # mantém o histórico entre reinícios (data/exited.json)
+net_monitor = true      # monitor de conexões de rede (aba Rede)
+net_interval = 2.0      # s entre leituras das conexões
+net_closed_max = 3000   # quantas conexões encerradas guardar (data/connections.json)
+
+[security]
+auth = true         # exige senha (recomendado: o painel pode finalizar processos)
+allow_kill = true   # permite finalizar processos pelo painel
+allow_power = true  # permite desligar/reiniciar a máquina pelo painel
+allow_unlock = true # permite bloquear/desbloquear a sessão (tela de bloqueio) pelo painel
+allow_launch = true # permite abrir aplicativos instalados pelo painel
+# senha: defina com  python3 server.py --set-password  (fica em data/auth.json, só o hash)
+
+[collectors]
+# Desativa coletores pelo nome, ex: disabled = ["network"]
+disabled = []
+
+[fan]
+# Controle da ventoinha pelo painel (aba "Ventoinha").
+enabled = true
+chip = "auto"             # "auto" ou o nome em /sys/class/hwmon/*/name (ex.: nct6686, it8688)
+channel = 0               # 0 = primeiro canal com ventoinha girando; ou N para pwmN/fanN
+                          # BC-250: chip = "nct6686", channel = 2 (conector "Pump Fan")
+sensor = "k10temp/Tctl"   # chip/label da temperatura da curva (AMD: k10temp/Tctl; Intel: coretemp/Package id 0)
+                          # se não existir, usa a temperatura da CPU detectada automaticamente
+min_pct = 20              # nunca abaixo disso
+emergency_temp = 92       # acima disso: 100%, em qualquer modo
+hysteresis = 3            # °C de folga antes de reduzir
+step_down = 2             # queda máxima em %/s (evita sobe-e-desce)
+on_exit = "firmware"      # ao parar o serviço: firmware (devolve à placa) | full (100%) | keep
