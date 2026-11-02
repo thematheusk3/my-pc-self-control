@@ -1,6 +1,7 @@
 import { $, bytes, esc, h, meter, mhz, pct, rate, tempChip, toast } from "../ui.js";
 import { Spark } from "../spark.js";
 import { openProcessSheet } from "../procsheet.js";
+import { STATUS, artSrc, controlMedia, livePos, mediaButtons, mmss } from "../media.js";
 
 let app, root, sparks = {}, topMode = "cpu";
 
@@ -70,7 +71,7 @@ function mount(el, a) {
     const b = e.target.closest("button[data-op]");
     if (!b) return;
     b.disabled = true;
-    try { await app.api("/api/media", { method: "POST", body: { player: b.dataset.player, op: b.dataset.op } }); }
+    try { await controlMedia(app, b); }
     catch (err) { toast(err.message, true); }
     b.disabled = false;
   });
@@ -247,18 +248,7 @@ function update(snap) {
 }
 
 // ---------- agora no PC ----------
-const mmss = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  return `${h ? `${h}:${String(m).padStart(2, "0")}` : m}:${String(s % 60).padStart(2, "0")}`; };
 const sinceTxt = t => { const s = Date.now() / 1000 - t; return s < 60 ? "agora" : s < 3600 ? `há ${Math.floor(s / 60)} min` : `há ${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
-const STATUS = { playing: ["good", "Tocando"], paused: ["", "Pausado"], stopped: ["", "Parado"] };
-
-function artSrc(p) {
-  if (!p.art) return null;
-  if (/^https?:\/\//.test(p.art)) return p.art;
-  if (p.art.startsWith("file://")) return `/api/media/art?player=${encodeURIComponent(p.id)}&v=${encodeURIComponent(p.art.slice(-40))}`;
-  return null;
-}
-
 function updateNow(f, m, ts) {
   const el = $("#ov-now", root);
   // janela em foco
@@ -293,7 +283,7 @@ function updateNow(f, m, ts) {
     const prog = $("[data-mprog]", el);
     prog.hidden = !p.length;
     if (p.length) {
-      const pos = Math.min(p.length, (p.position || 0) + (p.status === "playing" ? Math.max(0, ts - p.at) * (p.rate || 1) : 0));
+      const pos = livePos(p, ts);
       prog.querySelector("i").style.width = `${(pos / p.length) * 100}%`;
       $("[data-mtime]", el).textContent = `${mmss(pos)} / ${mmss(p.length)}`;
     }
@@ -301,10 +291,7 @@ function updateNow(f, m, ts) {
     const key = `${p.id}|${p.status}|${JSON.stringify(p.can)}`;
     if (app.info.features.control && btns.dataset.key !== key) {
       btns.dataset.key = key;
-      const pid = esc(p.id);
-      btns.innerHTML = `${p.can.previous ? `<button class="btn btn-sm" data-op="previous" data-player="${pid}" title="Anterior" aria-label="Anterior">⏮</button>` : ""}
-        ${p.can.play_pause ? `<button class="btn btn-sm" data-op="play_pause" data-player="${pid}" title="${p.status === "playing" ? "Pausar" : "Tocar"}" aria-label="${p.status === "playing" ? "Pausar" : "Tocar"}">${p.status === "playing" ? "⏸" : "▶"}</button>` : ""}
-        ${p.can.next ? `<button class="btn btn-sm" data-op="next" data-player="${pid}" title="Próxima" aria-label="Próxima">⏭</button>` : ""}`;
+      btns.innerHTML = mediaButtons(p);
     }
     if (!sub) sub = `${p.app}: ${p.title}`;
   }

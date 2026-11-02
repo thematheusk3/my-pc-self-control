@@ -31,7 +31,7 @@ class MediaError(Exception):
 
 
 def _busctl(*args: str, timeout: float = 3) -> subprocess.CompletedProcess:
-    return subprocess.run(["busctl", "--user", "--json=short", *args], capture_output=True, text=True,
+    return subprocess.run(["busctl", "--user", "--json=short", "--", *args], capture_output=True, text=True,
                           timeout=timeout, env=user_env())
 
 
@@ -89,7 +89,8 @@ def parse_player(name: str, root: dict, player: dict) -> dict:
         "position": round(pos / 1e6, 1) if isinstance(pos, (int, float)) and pos >= 0 else None,
         "rate": player.get("Rate") if isinstance(player.get("Rate"), (int, float)) else 1.0,
         "can": {"play_pause": bool(player.get("CanPause") or player.get("CanPlay")),
-                "next": bool(player.get("CanGoNext")), "previous": bool(player.get("CanGoPrevious"))},
+                "next": bool(player.get("CanGoNext")), "previous": bool(player.get("CanGoPrevious")),
+                "seek": bool(player.get("CanSeek")) and isinstance(length, (int, float)) and length > 0},
     }
 
 
@@ -128,11 +129,25 @@ class Media:
             raise MediaError("Player não encontrado (fechou?).", 404)
         return p
 
-    def control(self, pid: str, op: str) -> dict:
-        if op not in OPS:
+    def control(self, pid: str, op: str, offset: float = 0) -> dict:
+        """op em OPS, ou "seek" com offset em segundos (negativo volta)."""
+        if op == "seek":
+            p = self._find(pid)
+            if not p["can"].get("seek"):
+                raise MediaError("Este player não permite avançar/voltar.")
+            try:
+                us = int(float(offset) * 1e6)
+            except (TypeError, ValueError):
+                raise MediaError("offset inválido.") from None
+            if not us or abs(us) > 24 * 3600 * 10**6:
+                raise MediaError("offset inválido.")
+            args = ("Seek", "x", str(us))
+        elif op in OPS:
+            self._find(pid)
+            args = (OPS[op],)
+        else:
             raise MediaError("Operação inválida.")
-        self._find(pid)
-        r = _busctl("call", PREFIX + pid, PATH, "org.mpris.MediaPlayer2.Player", OPS[op])
+        r = _busctl("call", PREFIX + pid, PATH, "org.mpris.MediaPlayer2.Player", *args)
         if r.returncode:
             raise MediaError(f"O player recusou: {r.stderr.strip()[:200]}", 500)
         time.sleep(0.25)       # o player leva um instante para atualizar o estado

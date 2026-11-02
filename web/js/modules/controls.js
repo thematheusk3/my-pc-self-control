@@ -1,5 +1,6 @@
-// Aba Controles: Áudio (saída, volume, por app, microfone), Tela (resolução, brilho, desligar) e Captura de tela.
+// Aba Controles: Áudio (mídia tocando, saída, volume, por app, microfone), Tela (resolução, brilho, desligar) e Captura de tela.
 import { $, bytes, esc, toast } from "../ui.js";
+import { STATUS, artSrc, controlMedia, livePos, mediaButtons, mmss } from "../media.js";
 
 let app, root, view = "audio", timer = null, busy = false;
 let audio = null, disp = null, ddc = null, shots = null;
@@ -13,11 +14,22 @@ function mount(el, a) {
       <button data-v="display" aria-pressed="false">Tela</button>
       ${app.info.features.screenshot ? `<button data-v="shot" aria-pressed="false">Captura de tela</button>` : ""}
     </div>
+    <div data-media-wrap></div>
     <div data-body></div>`;
   $("[data-views]", el).addEventListener("click", e => {
     const b = e.target.closest("[data-v]");
     if (b) location.hash = b.dataset.v === "audio" ? "controls" : `controls:${b.dataset.v}`;
   });
+  const mw = $("[data-media-wrap]", el);
+  mw.addEventListener("click", async e => {
+    const b = e.target.closest("button[data-op]");
+    if (!b || b.disabled) return;
+    b.disabled = true;
+    try { renderMedia(await controlMedia(app, b), Date.now() / 1000); }
+    catch (err) { toast(err.message, true); }
+    b.disabled = false;
+  });
+  app.onSnapshot(snap => { if (view === "audio" && root.classList.contains("active")) renderMedia(snap.data.media, snap.ts); });
   const body = $("[data-body]", el);
   body.addEventListener("click", onClick);
   body.addEventListener("change", onChange);
@@ -31,6 +43,9 @@ function mount(el, a) {
 
 function route(sub) {
   view = ["display", "shot"].includes(sub) ? sub : "audio";
+  const mw = $("[data-media-wrap]", root);
+  mw.hidden = view !== "audio";
+  if (view === "audio" && app.snapshot) renderMedia(app.snapshot.data.media, app.snapshot.ts);
   root.querySelectorAll("[data-views] button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === view));
   $("[data-body]", root).innerHTML = `<div class="card empty">Carregando…</div>`;
   if (timer) start();
@@ -67,6 +82,44 @@ async function post(url, body, okMsg) {
     return r;
   } catch (e) { toast(e.message, true); return null; }
   finally { busy = false; }
+}
+
+// ---------- mídia (MPRIS) ----------
+// Fica fora do [data-body] (que o áudio redesenha a cada 2 s): só refaz o cartão quando muda
+// player/faixa/estado; nos outros segundos só anda a barra de progresso.
+function renderMedia(m, ts) {
+  const wrap = $("[data-media-wrap]", root);
+  if (!m) { wrap.innerHTML = ""; wrap.dataset.key = ""; return; }
+  const list = m.players.filter(p => p.title || p.status !== "stopped");
+  const key = JSON.stringify(list.map(p => [p.id, p.status, p.title, p.artist, p.album, p.art, p.can, !!p.length]));
+  if (wrap.dataset.key !== key) {
+    wrap.dataset.key = key;
+    const ctl = app.info.features.control;
+    wrap.innerHTML = `<article class="card media-card">
+      <div class="card-head"><div class="card-title">Mídia</div>${list.length > 1 ? `<span class="card-sub">${list.length} players</span>` : ""}</div>
+      ${list.length ? `<div class="media-list">${list.map(p => {
+        const src = artSrc(p);
+        return `<div class="now-media" data-pl="${esc(p.id)}">
+          ${src ? `<img class="media-art" src="${esc(src)}" alt="">` : `<img class="media-art" alt="" hidden>`}
+          <div class="media-info"><div class="media-title">${esc(p.title || "(sem título)")}</div>
+            <div class="media-sub">${esc([p.artist, p.album].filter(Boolean).join(" · "))}
+              <span class="media-app">${esc(p.app)} <span class="chip ${STATUS[p.status]?.[0] || ""}">${STATUS[p.status]?.[1] || esc(p.status)}</span></span></div>
+            ${p.length ? `<div class="media-prog"><div class="meter"><i></i></div><div class="media-time"></div></div>` : ""}</div>
+          ${ctl ? `<div class="media-btns">${mediaButtons(p, { seek: true })}</div>` : ""}
+        </div>`; }).join("")}</div>`
+      : `<p class="muted">${m.players.length ? `Player aberto (${esc(m.players.map(x => x.app).join(", "))}), nada tocando.` : "Nada tocando no PC."}</p>`}
+      ${ctl ? "" : `<p class="note">Controles desativados (security.allow_control).</p>`}
+    </article>`;
+    wrap.querySelectorAll("img.media-art:not([hidden])").forEach(img => img.addEventListener("error", () => { img.hidden = true; }));
+  }
+  for (const p of list) {
+    if (!p.length) continue;
+    const row = wrap.querySelector(`[data-pl="${CSS.escape(p.id)}"]`);
+    if (!row) continue;
+    const pos = livePos(p, ts);
+    row.querySelector(".media-prog i").style.width = `${(pos / p.length) * 100}%`;
+    row.querySelector(".media-time").textContent = `${mmss(pos)} / ${mmss(p.length)}`;
+  }
 }
 
 // ---------- áudio ----------

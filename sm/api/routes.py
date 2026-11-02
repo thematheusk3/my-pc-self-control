@@ -544,7 +544,7 @@ def media_control(req):
         return Response({"error": "Controles desativados (security.allow_control)."}, 403)
     body = req.json() or {}
     try:
-        return req.ctx.media.control(str(body.get("player", "")), str(body.get("op", "")))
+        return req.ctx.media.control(str(body.get("player", "")), str(body.get("op", "")), body.get("offset", 0))
     except MediaError as e:
         return Response({"error": str(e)}, e.status)
 

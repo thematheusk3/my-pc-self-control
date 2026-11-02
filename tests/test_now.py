@@ -51,6 +51,23 @@ class MediaTest(unittest.TestCase):
         with self.assertRaises(media.MediaError):      # player que não está na lista
             m.control("../../etc", "next")
 
+    def test_seek_validates(self):
+        m = media.Media()
+        m.players = [{"id": "vlc", "can": {"seek": True}}, {"id": "radio", "can": {"seek": False}}]
+        calls = []
+        orig = media._busctl
+        media._busctl = lambda *a, **k: calls.append(a) or type("R", (), {"returncode": 0, "stderr": ""})()
+        try:
+            for pid, off in (("radio", 10), ("vlc", 0), ("vlc", "x"), ("vlc", 10**9)):
+                with self.assertRaises(media.MediaError):
+                    m.control(pid, "seek", off)
+            self.assertEqual(calls, [])
+            m.collect = lambda: {}
+            m.control("vlc", "seek", -10)
+            self.assertEqual(calls[-1][-3:], ("Seek", "x", "-10000000"))
+        finally:
+            media._busctl = orig
+
 
 class FocusTest(unittest.TestCase):
     def test_parse_line(self):

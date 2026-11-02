@@ -27,7 +27,7 @@ O projeto é feito e testado no **[CachyOS](https://cachyos.org) com KDE Plasma 
   - **Suspeitos**: processos vivos ou encerrados com sinais comuns em malware.
   - **Analisar**: o que é o processo (pacote e descrição), executável, SHA-256 + link do VirusTotal,
     cadeia de processos pais, serviço systemd, portas e conexões, LD_PRELOAD.
-- **Controles**: áudio (saída fone/HDMI, volume, por aplicativo, microfone), tela (resolução, brilho,
+- **Controles**: áudio (mídia tocando com ⏮ ⏯ ⏭ e ±10 s, saída fone/HDMI, volume, por aplicativo, microfone), tela (resolução, brilho,
   apagar/espera) e captura de tela (sempre com aviso no PC).
 - **Alertas**: regras configuráveis com aviso no painel, na tela do PC e no celular (ntfy).
 - **Jogo/FPS** (na Visão geral): jogo aberto e FPS via MangoHud.
@@ -211,6 +211,7 @@ título (terminal, player) são enviadas no máximo a cada 10 s. Ao parar o serv
 Fora do KDE, em sessões X11, usa o `xprop`. Para desligar: `collectors.disabled = ["focus"]`.
 
 **Mídia**: lê os players MPRIS do D-Bus da sessão (`busctl`): título, artista, álbum, capa e posição.
+A Visão geral mostra o player principal; *Controles > Áudio* mostra todos, com voltar/avançar 10 s quando o player permite.
 Os botões ⏮ ⏯ ⏭ seguem `security.allow_control`. Desligar: `collectors.disabled = ["media"]`.
 
 ## Downloads da Steam
@@ -381,6 +382,7 @@ e adicione em `web/js/modules/index.js`. Use `app.onSnapshot(fn)` para receber d
 | GET | `/api/apps/<id>/icon` | ícone do aplicativo |
 | POST | `/api/apps/<id>/launch` | abre o aplicativo na sessão do usuário |
 | GET/POST | `/api/game` | jogo atual e FPS; `{"fps_enabled": true}` liga a leitura |
+| POST | `/api/media` | `{"player": "spotify", "op": "play_pause"\|"next"\|"previous"\|"seek", "offset": 10}` (offset em segundos, só no seek) |
 | GET/POST | `/api/audio` | estado do áudio; `{"op": "set_default"\|"volume"\|"mute"\|"move", ...}` |
 | GET | `/api/display` | monitores e modos |
 | POST | `/api/display/mode` | `{"output","mode"}` aplica (reverte em 20 s); `{"op":"confirm"\|"revert"}` |

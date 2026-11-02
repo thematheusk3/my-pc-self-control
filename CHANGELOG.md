@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3
+- Controles > Áudio: novo cartão **Mídia** no topo, com todos os players abertos (Spotify, navegador, VLC...):
+  capa, faixa, progresso e ⏮ ⏯ ⏭, mais **voltar/avançar 10 s** quando o player permite.
+- API: `POST /api/media` aceita `{"op": "seek", "offset": -10}` (segundos).
+- README: seção "Sistemas suportados" (feito para o CachyOS; Windows talvez no futuro).
+
 ## 0.4.2
 - Captura de tela: ao capturar, a imagem abre na hora por cima do painel (com "Tamanho real" e "Baixar").
 

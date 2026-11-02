@@ -418,6 +418,14 @@ select.search { flex: 0 1 auto; }
 .media-btns { grid-column: 1 / -1; display: flex; gap: 8px; }
 .media-btns:empty { display: none; }
 .media-btns .btn { flex: 1; font-size: 16px; }
+/* Controles > Áudio: cartão com todos os players */
+.media-card { margin-bottom: 12px; }
+.media-list { display: grid; gap: 0 24px; }
+.media-list .now-media:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+@media (min-width: 900px) {
+  .media-list { grid-template-columns: repeat(2, 1fr); }
+  .media-list .now-media:nth-child(2) { margin-top: 0; padding-top: 0; border-top: 0; }
+}
 
 /* ---------- downloads da Steam ---------- */
 .dl-item + .dl-item { margin-top: 6px; }
