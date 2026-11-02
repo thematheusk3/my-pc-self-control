@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.4
+- **Serviço como root** (`install.sh --root`): sessão, áudio, tela, captura, mídia, janela em foco e abrir apps
+  não funcionavam ("Ninguém está logado", "Servidor de áudio indisponível", `kscreen-doctor: -6`), porque o painel
+  procurava a sessão do próprio root. Agora esses comandos rodam como o dono da área de trabalho (gravado pelo
+  instalador em `SM_DESKTOP_USER`; senão o do login automático ou da sessão aberta).
+- Instalador: rodado de um terminal já como root (`su -`) sem `--root`, usa o dono da sessão gráfica em vez de
+  instalar como root sem avisar; nova opção `--user NOME`. O `login-pelo-celular.sh` recusa o mesmo engano.
+- Sistema > Sessão: se há sessão aberta de outra conta, avisa que o painel está ligado à conta errada e como corrigir.
+- Sensores/Ventoinha: sem nenhuma ventoinha encontrada, mostra qual driver falta para a placa-mãe (ex.: MSI →
+  NCT6687D, Gigabyte → it87) e como carregá-lo.
+- `tools/diagnostico.sh`: coleta, sem mudar nada, o que é preciso para entender sessão, áudio, tela e ventoinhas.
+- `PARIDADE.md`: o que dá para levar entre as versões Linux e Windows (mesmo arquivo nos dois repositórios).
+
 ## 0.4.3
 - Controles > Áudio: novo cartão **Mídia** no topo, com todos os players abertos (Spotify, navegador, VLC...):
   capa, faixa, progresso e ⏮ ⏯ ⏭, mais **voltar/avançar 10 s** quando o player permite.

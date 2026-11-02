@@ -15,7 +15,7 @@ O projeto é feito e testado no **[CachyOS](https://cachyos.org) com KDE Plasma 
 | Arch Linux, EndeavourOS, Manjaro e outros baseados em Arch, com KDE Plasma 6 | Deve funcionar por completo (mesmos pacotes, `pacman`/AUR). Não testado. |
 | Outras distros com systemd (Debian/Ubuntu, Fedora, openSUSE...) com KDE Plasma 6 | Funciona em grande parte: o instalador usa `apt`/`dnf`/`zypper` e as atualizações pendentes usam `apt`/`dnf`. Não testado. |
 | Linux com outro ambiente gráfico (GNOME, XFCE...) | Monitoramento, processos, rede, sensores, ventoinha, áudio, mídia, alertas e desligar funcionam. Ficam de fora o que depende do KDE: resolução da tela (`kscreen-doctor`), captura (Spectacle), abrir apps (`kioclient`), janela em foco no Wayland (KWin; no X11 usa `xprop`) e o login pelo celular (plasmalogin/SDDM). |
-| Windows | Não suportado. Uma versão para Windows pode ser implementada no futuro. |
+| Windows 10/11 | Versão separada: [self-monitoring-win](https://github.com/thematheusk3/self-monitoring-win). O que difere entre as duas está em [PARIDADE.md](PARIDADE.md). |
 
 ## O que mostra
 
@@ -313,6 +313,7 @@ sm/
   media.py                o que está tocando (MPRIS via busctl) e controles
   steamdl.py              downloads/atualizações da Steam (content_log + appmanifest)
 tools/login-pelo-celular.sh  liga/desliga o login automático com a sessão bloqueada
+tools/diagnostico.sh        coleta o necessário para entender sessão, áudio, tela e ventoinhas (não muda nada)
 tools/simular-suspeito.sh processos inofensivos que imitam malware (para testar a aba Suspeitos)
   auth.py                 senha (hash scrypt), sessões e limite de tentativas
   api/routes.py           endpoints REST

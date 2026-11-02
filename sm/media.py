@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from .desktop import user_env
+from .desktop import as_user, user_env
 
 log = logging.getLogger(__name__)
 PREFIX = "org.mpris.MediaPlayer2."
@@ -31,7 +31,7 @@ class MediaError(Exception):
 
 
 def _busctl(*args: str, timeout: float = 3) -> subprocess.CompletedProcess:
-    return subprocess.run(["busctl", "--user", "--json=short", "--", *args], capture_output=True, text=True,
+    return subprocess.run(as_user(["busctl", "--user", "--json=short", "--", *args]), capture_output=True, text=True,
                           timeout=timeout, env=user_env())
 
 

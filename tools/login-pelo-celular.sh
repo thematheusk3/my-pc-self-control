@@ -10,7 +10,11 @@
 # Funciona com Plasma (plasmalogin ou SDDM). Faz backup da configuração antes de mexer.
 set -euo pipefail
 ACTION="${1:-status}"
-TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_USER="${SM_USER:-${SUDO_USER:-${USER:-$(id -un)}}}"
+if [[ "$TARGET_USER" == root ]]; then
+  echo "Rode a partir da sua conta (sudo ...), não de um terminal já como root; ou: sudo SM_USER=seu_usuario $0 $ACTION"
+  exit 1
+fi
 CONF=""
 for c in /etc/plasmalogin.conf /etc/sddm.conf; do [[ -f "$c" ]] && { CONF="$c"; break; }; done
 [[ -n "$CONF" ]] || { echo "Não encontrei /etc/plasmalogin.conf nem /etc/sddm.conf (gerenciador de login não suportado)."; exit 1; }

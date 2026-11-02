@@ -3,6 +3,7 @@
 #
 #   sudo ./install.sh               instala ou atualiza (serviço roda como o seu usuário; recomendado)
 #   sudo ./install.sh --root        serviço roda como root (vê e finaliza qualquer processo, vê todas as conexões)
+#   sudo ./install.sh --user NOME   serviço roda como NOME (quando o terminal já é root, ex.: depois de `su -`)
 #   sudo ./install.sh --no-service  só copia os arquivos
 #   sudo ./install.sh --uninstall   remove serviço, helper e regra do polkit (mantém config e dados)
 #   sudo ./install.sh --purge       como --uninstall e apaga também /opt/applications/self-monitoring
@@ -13,17 +14,20 @@ set -euo pipefail
 
 DEST="${SM_DEST:-/opt/applications/self-monitoring}"
 SRC="$(cd "$(dirname "$0")" && pwd)"
-RUN_AS="${SUDO_USER:-$USER}"
+RUN_AS="${SUDO_USER:-${USER:-$(id -un)}}"
+EXPLICIT_ROOT=0
 SERVICE=1
 UNINSTALL=0
 PURGE=0
-for a in "$@"; do
+while [[ $# -gt 0 ]]; do
+  a="$1"; shift
   case "$a" in
-    --root) RUN_AS=root ;;
+    --root) RUN_AS=root; EXPLICIT_ROOT=1 ;;
+    --user) RUN_AS="${1:?--user precisa do nome do usuário}"; shift ;;
     --no-service) SERVICE=0 ;;
     --uninstall) UNINSTALL=1 ;;
     --purge) UNINSTALL=1; PURGE=1 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "opção desconhecida: $a (use --help)"; exit 1 ;;
   esac
 done
@@ -67,8 +71,26 @@ if ! command -v python3 >/dev/null || need_pkgs; then
   need_pkgs && { echo "Ainda falta python3 >= 3.11 com psutil."; exit 1; }
 fi
 
+# Terminal já como root (su -, login como root) sem --root: o serviço viraria root sem querer e não acharia a
+# sessão gráfica, o áudio nem a tela. Usa o dono da sessão gráfica aberta, se houver.
+if [[ "$RUN_AS" == root && $EXPLICIT_ROOT -eq 0 && $UNINSTALL -eq 0 ]]; then
+  GUI_USER=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$2 >= 1000 {print $3}' | while read -r u; do
+    for s in $(loginctl show-user "$u" -p Sessions --value 2>/dev/null); do
+      [[ "$(loginctl show-session "$s" -p Type --value 2>/dev/null)" =~ ^(wayland|x11)$ ]] && { echo "$u"; break 2; }
+    done; done | head -n1)
+  if [[ -n "$GUI_USER" ]]; then
+    RUN_AS="$GUI_USER"
+    echo "Terminal como root: o serviço vai rodar como $RUN_AS (dono da sessão gráfica). Para root de verdade, use --root."
+  else
+    echo "Rode a partir da sua conta (sudo ./install.sh), ou informe o usuário: sudo ./install.sh --user NOME"
+    echo "(para rodar como root de propósito: --root)"
+    exit 1
+  fi
+fi
+id "$RUN_AS" >/dev/null 2>&1 || { echo "Usuário não existe: $RUN_AS"; exit 1; }
+
 # ---------- arquivos ----------
-OWNER="${SUDO_USER:-$(id -un)}"
+OWNER="${SUDO_USER:-$RUN_AS}"
 mkdir -p "$DEST"
 if [[ "$SRC" != "$DEST" ]]; then
   # copia o código; nunca sobrescreve config.toml nem data/ da máquina
@@ -98,7 +120,10 @@ if [[ $SERVICE -eq 1 ]]; then
   if [[ "$RUN_AS" != root ]] && getent group i2c >/dev/null && ! id -nG "$RUN_AS" | grep -qw i2c; then
     usermod -aG i2c "$RUN_AS" && echo "Usuário $RUN_AS adicionado ao grupo i2c (controle de brilho do monitor)."
   fi
-  sed -e "s|@USER@|$RUN_AS|" -e "s|@DIR@|$DEST|g" "$DEST/deploy/self-monitoring.service" > /etc/systemd/system/self-monitoring.service
+  # como root, os comandos da sessão (áudio, tela, notificações) rodam como o dono da área de trabalho
+  DESKTOP_USER="$OWNER"; [[ "$DESKTOP_USER" == root ]] && DESKTOP_USER=""
+  sed -e "s|@USER@|$RUN_AS|" -e "s|@DIR@|$DEST|g" -e "s|@DESKTOP_USER@|$DESKTOP_USER|" \
+      "$DEST/deploy/self-monitoring.service" > /etc/systemd/system/self-monitoring.service
   systemctl daemon-reload
   systemctl enable self-monitoring.service >/dev/null 2>&1
   systemctl restart self-monitoring.service

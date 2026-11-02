@@ -7,6 +7,8 @@ Wants=network-online.target
 Type=simple
 User=@USER@
 WorkingDirectory=@DIR@
+# só usado com o serviço como root (install.sh --root): dono da área de trabalho
+Environment=SM_DESKTOP_USER=@DESKTOP_USER@
 # "+" = roda como root: permissão para o painel controlar a ventoinha (pwm* do hwmon)
 ExecStartPre=+/usr/local/lib/self-monitoring/fan-helper grant @USER@
 ExecStart=/usr/bin/python3 @DIR@/server.py

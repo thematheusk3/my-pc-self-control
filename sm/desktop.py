@@ -5,6 +5,10 @@ Desbloqueio remoto: o painel pede ao systemd-logind para desbloquear a sessão d
 pode fazer isso sem privilégio extra. Para "entrar pelo celular" ao ligar o PC, use login
 automático + sessão iniciando bloqueada (tools/login-pelo-celular.sh).
 
+Usuário da área de trabalho: normalmente o próprio usuário do serviço. Com o serviço rodando como root
+(install.sh --root), os comandos que falam com a sessão (PipeWire, KScreen, notificações...) rodam como o dono
+da área de trabalho (SM_DESKTOP_USER, gravado pelo instalador; senão o do login automático ou da sessão aberta).
+
 Abrir aplicativos: roda o .desktop dentro do gerenciador de serviços do usuário
 (`systemd-run --user`), que já tem o ambiente da sessão gráfica (WAYLAND_DISPLAY etc.).
 """
@@ -24,20 +28,86 @@ import time
 from pathlib import Path
 
 log = logging.getLogger(__name__)
-UID = os.getuid()
-USER = pwd.getpwuid(UID).pw_name
-HOME = Path(pwd.getpwuid(UID).pw_dir)
-RUNTIME = f"/run/user/{UID}"
+SERVICE_UID = os.getuid()
+SERVICE_USER = pwd.getpwuid(SERVICE_UID).pw_name
 LANGS = [os.environ.get("LANG", "pt_BR.UTF-8").split(".")[0], "pt_BR", "pt"]
+LOGIN_CONFS = ("/etc/plasmalogin.conf", "/etc/sddm.conf")
 
 
 def _run(cmd: list[str], timeout: float = 10, env: dict | None = None) -> subprocess.CompletedProcess:
+    """env != None = comando da sessão do usuário (roda como o dono da área de trabalho)."""
+    if env is not None:
+        cmd = as_user(cmd)
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+
+
+def list_sessions() -> list[dict]:
+    """Sessões do logind: [{"session", "uid", "user"}, ...]."""
+    try:
+        out = subprocess.run(["loginctl", "list-sessions", "--json=short"], capture_output=True, text=True,
+                             timeout=10).stdout
+        sessions = json.loads(out or "[]")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        sessions = []
+    if not sessions:   # systemd antigo: sem --json; colunas SESSION UID USER ...
+        try:
+            out = subprocess.run(["loginctl", "list-sessions", "--no-legend"], capture_output=True, text=True,
+                                 timeout=10).stdout
+        except (OSError, subprocess.SubprocessError):
+            return []
+        for line in out.splitlines():
+            f = line.split()
+            if len(f) >= 3 and f[1].isdigit():
+                sessions.append({"session": f[0], "uid": int(f[1]), "user": f[2]})
+    return sessions
+
+
+def autologin_user() -> str | None:
+    for conf in LOGIN_CONFS:
+        cp = configparser.ConfigParser(strict=False, interpolation=None)
+        try:
+            cp.read(conf)
+        except configparser.Error:
+            continue
+        if cp.has_option("Autologin", "User"):
+            return cp.get("Autologin", "User").strip() or None
+    return None
+
+
+def _desktop_account() -> pwd.struct_passwd:
+    me = pwd.getpwuid(SERVICE_UID)
+    if SERVICE_UID != 0:
+        return me
+    names = [os.environ.get("SM_DESKTOP_USER"), autologin_user()]
+    names += [s.get("user") for s in list_sessions() if int(s.get("uid", 0)) >= 1000]
+    for name in names:
+        if name and name != "root":
+            try:
+                return pwd.getpwnam(name)
+            except KeyError:
+                continue
+    return me
+
+
+_ACCOUNT = _desktop_account()
+UID, GID = _ACCOUNT.pw_uid, _ACCOUNT.pw_gid
+USER = _ACCOUNT.pw_name
+HOME = Path(_ACCOUNT.pw_dir)
+RUNTIME = f"/run/user/{UID}"
+
+
+def as_user(cmd: list[str]) -> list[str]:
+    """Serviço como root: roda o comando como o dono da área de trabalho (o barramento da sessão só
+    aceita o próprio usuário)."""
+    if SERVICE_UID == 0 and UID != 0:
+        return ["setpriv", f"--reuid={UID}", f"--regid={GID}", "--init-groups", "--", *cmd]
+    return cmd
 
 
 def user_env() -> dict:
     """Ambiente para falar com o systemd --user (o serviço roda fora da sessão)."""
-    return {**os.environ, "XDG_RUNTIME_DIR": RUNTIME, "DBUS_SESSION_BUS_ADDRESS": f"unix:path={RUNTIME}/bus"}
+    return {**os.environ, "HOME": str(HOME), "USER": USER, "LOGNAME": USER,
+            "XDG_RUNTIME_DIR": RUNTIME, "DBUS_SESSION_BUS_ADDRESS": f"unix:path={RUNTIME}/bus"}
 
 
 _SESSION_ENV: tuple[float, dict] | None = None
@@ -82,24 +152,12 @@ def notify_pc(title: str, body: str, urgency: str = "normal", icon: str = "dialo
 
 
 # ---------- sessão ----------
-def graphical_session() -> dict | None:
-    """Sessão gráfica (wayland/x11) do usuário do serviço, se existir."""
-    try:
-        out = _run(["loginctl", "list-sessions", "--json=short"]).stdout
-        sessions = json.loads(out or "[]")
-    except (OSError, ValueError, subprocess.SubprocessError):
-        sessions = []
-    if not sessions:   # systemd antigo: sem --json; colunas SESSION UID USER ...
-        try:
-            for line in _run(["loginctl", "list-sessions", "--no-legend"]).stdout.splitlines():
-                f = line.split()
-                if len(f) >= 2 and f[1].isdigit():
-                    sessions.append({"session": f[0], "uid": int(f[1])})
-        except (OSError, subprocess.SubprocessError):
-            return None
+def graphical_session(uid: int | None = None) -> dict | None:
+    """Sessão gráfica (wayland/x11) do dono da área de trabalho (ou de `uid`), se existir."""
+    uid = UID if uid is None else uid
     best = None
-    for s in sessions:
-        if int(s.get("uid", -1)) != UID:
+    for s in list_sessions():
+        if int(s.get("uid", -1)) != uid:
             continue
         props = {}
         r = _run(["loginctl", "show-session", str(s["session"]),
@@ -119,18 +177,21 @@ def graphical_session() -> dict | None:
     return best
 
 
+def other_desktop_users() -> list[str]:
+    """Usuários com sessão gráfica aberta que não são o do painel (painel instalado na conta errada)."""
+    seen = {}
+    for s in list_sessions():
+        uid = int(s.get("uid", -1))
+        if uid in (UID, 0) or uid in seen:
+            continue
+        if graphical_session(uid):
+            seen[uid] = s.get("user") or str(uid)
+    return list(seen.values())
+
+
 def autologin_status() -> dict:
     """Lê (sem root) se o login automático + bloqueio ao iniciar estão configurados."""
-    auto_user = None
-    for conf in ("/etc/plasmalogin.conf", "/etc/sddm.conf"):
-        cp = configparser.ConfigParser(strict=False, interpolation=None)
-        try:
-            cp.read(conf)
-        except configparser.Error:
-            continue
-        if cp.has_option("Autologin", "User"):
-            auto_user = cp.get("Autologin", "User").strip() or None
-            break
+    auto_user = autologin_user()
     lock_on_start = False
     rc = HOME / ".config" / "kscreenlockerrc"
     cp = configparser.ConfigParser(strict=False, interpolation=None)
@@ -143,7 +204,9 @@ def autologin_status() -> dict:
 
 
 def session_status() -> dict:
-    return {"user": USER, "session": graphical_session(), **autologin_status()}
+    s = graphical_session()
+    return {"user": USER, "service_user": SERVICE_USER, "session": s,
+            "other_users": [] if s else other_desktop_users(), **autologin_status()}
 
 
 class SessionError(Exception):

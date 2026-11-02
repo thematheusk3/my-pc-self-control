@@ -19,7 +19,8 @@ function update(snap) {
   const chips = snap.data.sensors?.chips || [];
   const grid = $("[data-grid]", root);
   if (!chips.length) { grid.innerHTML = `<div class="card empty span-all">Nenhum sensor hwmon encontrado. Instale <code>lm_sensors</code> e rode <code>sensors-detect</code>.</div>`; return; }
-  grid.innerHTML = chips.map(c => {
+  const hint = snap.data.sensors.fan_hint ? `<div class="card span-all"><p class="note" style="margin:0">⚠ ${snap.data.sensors.fan_hint}</p></div>` : "";
+  grid.innerHTML = hint + chips.map(c => {
     const groups = {};
     for (const r of c.readings) (groups[r.kind] ||= []).push(r);
     const body = Object.entries(groups).map(([k, rs]) => `

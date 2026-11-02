@@ -46,3 +46,28 @@ class DesktopTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RootServiceTest(unittest.TestCase):
+    """Serviço como root (install.sh --root): sessão, áudio e tela são do dono da área de trabalho."""
+
+    def test_desktop_account_as_root(self):
+        import os
+        import pwd
+        from unittest import mock
+        me = pwd.getpwuid(os.getuid())
+        with mock.patch.object(desktop, "SERVICE_UID", 0), mock.patch.dict(os.environ, {"SM_DESKTOP_USER": me.pw_name}):
+            self.assertEqual(desktop._desktop_account().pw_name, me.pw_name)
+        with mock.patch.object(desktop, "SERVICE_UID", 0), mock.patch.dict(os.environ, {"SM_DESKTOP_USER": ""}), \
+                mock.patch.object(desktop, "autologin_user", return_value=None), \
+                mock.patch.object(desktop, "list_sessions", return_value=[{"session": "3", "uid": me.pw_uid, "user": me.pw_name}]):
+            self.assertEqual(desktop._desktop_account().pw_name, me.pw_name)
+
+    def test_as_user_wraps_only_for_root(self):
+        from unittest import mock
+        with mock.patch.object(desktop, "SERVICE_UID", 0), mock.patch.object(desktop, "UID", 1000), \
+                mock.patch.object(desktop, "GID", 1000):
+            self.assertEqual(desktop.as_user(["pactl", "info"])[:4],
+                             ["setpriv", "--reuid=1000", "--regid=1000", "--init-groups"])
+        with mock.patch.object(desktop, "SERVICE_UID", 1000), mock.patch.object(desktop, "UID", 1000):
+            self.assertEqual(desktop.as_user(["pactl", "info"]), ["pactl", "info"])

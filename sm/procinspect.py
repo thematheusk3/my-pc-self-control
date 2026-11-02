@@ -19,8 +19,8 @@ from pathlib import Path
 import psutil
 
 from .config import ROOT
+from .desktop import HOME   # rodando como root: a pasta do dono da área de trabalho, não /root
 
-HOME = Path.home()
 TRUST_FILE = ROOT / "data" / "trusted.json"
 
 # lugares onde executáveis normalmente NÃO deveriam estar

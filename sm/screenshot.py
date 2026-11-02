@@ -7,6 +7,7 @@ A captura é feita pelo Spectacle (KDE), que tem permissão do KWin para captura
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -14,7 +15,7 @@ import time
 from pathlib import Path
 
 from .config import ROOT
-from .desktop import graphical_session, notify_pc, session_env
+from .desktop import GID, SERVICE_UID, UID, as_user, graphical_session, notify_pc, session_env
 
 log = logging.getLogger(__name__)
 DIR = ROOT / "data" / "screenshots"
@@ -42,6 +43,8 @@ def take(requested_by: str) -> dict:
     # 2) captura
     DIR.mkdir(parents=True, exist_ok=True)
     DIR.chmod(0o700)
+    if SERVICE_UID == 0:   # o Spectacle roda como o dono da área de trabalho e grava aqui
+        os.chown(DIR, UID, GID)
     stem = time.strftime("shot-%Y%m%d-%H%M%S")
     name = f"{stem}.png"
     n = 1
@@ -52,7 +55,7 @@ def take(requested_by: str) -> dict:
     cmd = ["systemd-run", "--user", "--wait", "--collect", "--quiet", "-p", "Type=exec", "--",
            "spectacle", "--background", "--nonotify", "--fullscreen", "--output", str(path)]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=session_env())
+        r = subprocess.run(as_user(cmd), capture_output=True, text=True, timeout=30, env=session_env())
     except (OSError, subprocess.SubprocessError) as e:
         raise ShotError(f"Falha ao capturar: {e}", 500) from None
     if not _wait_complete(path):

@@ -274,7 +274,7 @@ function update(snap) {
   if (!root.classList.contains("active")) return;
   const f = snap.data.fan;
   if (!f || f.error && f.available === undefined) {
-    $(".grid", root).innerHTML = `<div class="card empty span-all">Controle de ventoinha indisponível${f?.error ? `: ${esc(f.error)}` : ""}.</div>`;
+    $(".grid", root).innerHTML = `<div class="card empty span-all">Controle de ventoinha indisponível${f?.error ? `: ${esc(f.error)}` : ""}.${snap.data.sensors?.fan_hint ? `<p class="note">${snap.data.sensors.fan_hint}</p>` : ""}</div>`;
     return;
   }
   st = f;

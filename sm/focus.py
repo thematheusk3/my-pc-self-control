@@ -18,7 +18,7 @@ import threading
 import time
 
 from .config import ROOT
-from .desktop import graphical_session, session_env, user_env
+from .desktop import as_user, graphical_session, session_env, user_env
 
 log = logging.getLogger(__name__)
 SCRIPT_NAME = "self-monitoring-focus"
@@ -51,7 +51,7 @@ report(active());
 
 
 def _busctl(*args: str, timeout: float = 5) -> subprocess.CompletedProcess:
-    return subprocess.run(["busctl", "--user", *args], capture_output=True, text=True, timeout=timeout,
+    return subprocess.run(as_user(["busctl", "--user", *args]), capture_output=True, text=True, timeout=timeout,
                           env=user_env())
 
 
@@ -126,7 +126,7 @@ class FocusMonitor:
         while not self._stop.is_set():
             try:
                 self.proc = subprocess.Popen(
-                    ["journalctl", "--user", "-f", "-n", "0", "-o", "cat", "_COMM=kwin_wayland", "_COMM=kwin_x11"],
+                    as_user(["journalctl", "--user", "-f", "-n", "0", "-o", "cat", "_COMM=kwin_wayland", "_COMM=kwin_x11"]),
                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env=user_env())
                 for line in self.proc.stdout:
                     ours, w = parse_line(line)
