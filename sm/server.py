@@ -68,19 +68,35 @@ class Handler(BaseHTTPRequestHandler):
     def _session_cookie(self, sid: str, max_age: int = 30 * 24 * 3600) -> dict:
         return {"Set-Cookie": f"{COOKIE}={sid}; Path=/; Max-Age={max_age}; HttpOnly; SameSite=Strict"}
 
+    MAX_BODY = 1_000_000
+
+    def _read_body(self) -> bytes:
+        """Lê SEMPRE o corpo inteiro do pedido, antes de qualquer rota. Com keep-alive (HTTP/1.1),
+        um corpo não lido fica na conexão e vira o começo do próximo pedido: ex. o POST de captura
+        (corpo "{}") fazia o GET seguinte chegar como "{}GET /api/screenshots" -> 501."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+            self.close_connection = True
+        if n <= 0:
+            return b""
+        if n > self.MAX_BODY:          # grande demais: não lê, e fecha a conexão depois da resposta
+            self.close_connection = True
+            return b""
+        return self.rfile.read(n)
+
     def _form(self) -> dict:
-        n = int(self.headers.get("Content-Length") or 0)
-        return {k: v[0] for k, v in parse_qs(self.rfile.read(min(n, 10_000)).decode(errors="replace")).items()}
+        return {k: v[0] for k, v in parse_qs(self._body[:10_000].decode(errors="replace")).items()}
 
     def _redirect(self, location: str, headers: dict | None = None) -> None:
         self._send(303, b"", "text/plain", {"Location": location, **(headers or {})})
 
     def json(self):
-        n = int(self.headers.get("Content-Length") or 0)
-        if not n:
+        if not self._body:
             return None
         try:
-            return json.loads(self.rfile.read(min(n, 1_000_000)))
+            return json.loads(self._body)
         except ValueError:
             return None
 
@@ -95,6 +111,7 @@ class Handler(BaseHTTPRequestHandler):
         self._dispatch("POST")
 
     def _dispatch(self, method: str) -> None:
+        self._body = self._read_body()
         url = urlsplit(self.path)
         self.query = parse_qs(url.query)
         path = url.path
