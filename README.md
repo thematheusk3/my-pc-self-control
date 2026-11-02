@@ -38,7 +38,9 @@ O projeto é feito e testado no **[CachyOS](https://cachyos.org) com KDE Plasma 
 - **Sensores**: todos os sensores hwmon (temperaturas, ventoinhas, tensões), agrupados por chip.
 - **Ventoinha**: controle da ventoinha por PWM: **automático** (curva temperatura × velocidade editável,
   com perfis prontos), **manual** (velocidade fixa) ou **placa** (devolve o controle ao firmware).
-- **Sistema**: informações do host e do próprio monitor; **desligar/reiniciar** a máquina (com confirmação e opção de forçar).
+- **Sistema**: informações do host e do próprio monitor; **desligar/reiniciar** a máquina (com confirmação e opção de forçar);
+  **quem está acessando** o painel (aparelho, IP, nome na rede, MAC, encerrar sessões, histórico de acessos) e
+  **ações feitas pelo painel** (quem fez o quê, quando e se deu certo).
 
 Gráficos com os últimos 5 minutos, atualização em tempo real (SSE, 1 s; o topo mostra o horário da última
 atualização e fica vermelho com "Offline · HH:MM:SS há X" se os dados pararem de chegar), tema claro/escuro,
@@ -90,6 +92,8 @@ e dos scripts a cada push. Veja **Estrutura e como estender** abaixo e registre 
 - A primeira senha só pode ser criada na própria máquina (localhost ou terminal), não pela rede.
 - Depois de 5 senhas erradas em 5 min, o IP fica bloqueado por 2 min.
 - Trocar a senha encerra as sessões dos outros aparelhos. Esqueceu a senha? Rode `--set-password` na máquina.
+- Todo login e todo bloqueio por senha errada aparecem como notificação na tela do PC. Sessões abertas e histórico
+  de acessos ficam em Sistema > Quem está acessando; tudo o que o painel muda no PC fica em Sistema > Ações feitas pelo painel.
 - PID 1, o próprio servidor e threads do kernel são protegidos.
 - A finalização confere o horário de criação do processo, para não matar um PID reaproveitado.
 - Rodando como usuário comum, só processos desse usuário podem ser finalizados.
@@ -315,7 +319,9 @@ sm/
 tools/login-pelo-celular.sh  liga/desliga o login automático com a sessão bloqueada
 tools/diagnostico.sh        coleta o necessário para entender sessão, áudio, tela e ventoinhas (não muda nada)
 tools/simular-suspeito.sh processos inofensivos que imitam malware (para testar a aba Suspeitos)
-  auth.py                 senha (hash scrypt), sessões e limite de tentativas
+  auth.py                 senha (hash scrypt), sessões, limite de tentativas e histórico de acessos
+  clients.py              quem está acessando: origem do IP, nome (DNS reverso), MAC (ARP), aparelho
+  audit.py                registro de ações feitas pelo painel (descritor por rota)
   api/routes.py           endpoints REST
   collectors/             UM ARQUIVO POR COLETOR (carregados automaticamente)
     cpu.py gpu.py memory.py disks.py network.py sensors.py processes.py system.py focus.py media.py steam.py

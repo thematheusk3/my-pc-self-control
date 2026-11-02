@@ -85,7 +85,7 @@ class AlertsTest(unittest.TestCase):
         ctx.data, ctx.proctrack, ctx.netmon, ctx.updates = {}, None, None, None
         self.ctx = ctx
         self.a = al.Alerts(ctx)
-        self.a._deliver = lambda a: None
+        self.a._deliver = lambda a, pc=True: None
 
     def tearDown(self):
         al.CONF_FILE, al.LOG_FILE = self._orig

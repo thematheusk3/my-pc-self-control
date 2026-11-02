@@ -113,8 +113,9 @@ class Alerts:
         return float(self.conf["rules"][rid].get("value") or RULES[rid][2])
 
     # ---------- disparo ----------
-    def event(self, rid: str, text: str, level: str = "warning", key: str | None = None) -> None:
-        """Dispara um alerta (respeitando liga/desliga e o cooldown por chave)."""
+    def event(self, rid: str, text: str, level: str = "warning", key: str | None = None, pc: bool = True) -> None:
+        """Dispara um alerta (respeitando liga/desliga e o cooldown por chave).
+        pc=False: quem chamou já mostrou o aviso na tela do PC (não duplica)."""
         if not self._on(rid):
             return
         k = f"{rid}:{key or ''}"
@@ -129,11 +130,11 @@ class Alerts:
             self.history.appendleft(a)
             self._save()
         log.warning("alerta: %s — %s", a["title"], text)
-        threading.Thread(target=self._deliver, args=(a,), daemon=True).start()
+        threading.Thread(target=self._deliver, args=(a, pc), daemon=True).start()
 
-    def _deliver(self, a: dict) -> None:
+    def _deliver(self, a: dict, pc: bool = True) -> None:
         ch = self.conf["channels"]
-        if ch.get("pc"):
+        if pc and ch.get("pc"):
             try:
                 from .desktop import notify_pc
                 notify_pc(f"⚠ {a['title']}", a["text"], urgency="critical" if a["level"] == "critical" else "normal",

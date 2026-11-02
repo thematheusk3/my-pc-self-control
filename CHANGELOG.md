@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.5
+Trazido da versão Windows (0.5.2-win e 0.5.3-win):
+- Sistema > **Quem está acessando**: sessões abertas com aparelho, IP, origem (este PC, rede local, VPN, internet),
+  nome na rede (DNS reverso) e MAC (tabela ARP do kernel), última atividade e botão para encerrar a sessão de outro
+  aparelho (ou todas as outras). Histórico dos últimos acessos: logins, saídas, senhas erradas, bloqueios, sessões
+  encerradas (`data/access-log.json`).
+- **Todo login no painel mostra uma notificação na tela do PC** (e todo IP bloqueado por senha errada), sempre,
+  independente dos alertas. O alerta "Novo acesso ao painel" continua indo para o painel/ntfy e não duplica no PC.
+- Sistema > **Ações feitas pelo painel**: registro de tudo que muda algo no PC ou no painel (processos, energia,
+  sessão, apps, áudio, mídia, tela, captura, ventoinha, FPS, senha, sessões, alertas), com aparelho, IP, sessão, hora
+  e resultado, inclusive tentativas recusadas. Ajustes seguidos (arrastar volume, brilho, velocidade da ventoinha)
+  viram uma linha. Filtros por categoria e por aparelho; "Ver ações" em cada sessão (`data/audit-log.json`).
+- API: `GET /api/auth/sessions`, `POST /api/auth/sessions/end`, `GET /api/audit`.
+
 ## 0.4.4
 - **Serviço como root** (`install.sh --root`): sessão, áudio, tela, captura, mídia, janela em foco e abrir apps
   não funcionavam ("Ninguém está logado", "Servidor de áudio indisponível", `kscreen-doctor: -6`), porque o painel
