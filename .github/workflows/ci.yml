@@ -27,4 +27,4 @@ jobs:
             cp "$f" /tmp/check.mjs && node --check /tmp/check.mjs || { echo "erro em $f"; exit 1; }
           done
       - name: Sintaxe dos scripts shell
-        run: for f in install.sh deploy/*.sh tools/*.sh; do bash -n "$f"; done
+        run: for f in install.sh atualizar.sh deploy/*.sh tools/*.sh; do bash -n "$f"; done

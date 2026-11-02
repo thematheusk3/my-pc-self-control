@@ -67,7 +67,9 @@ O login dura 30 dias; a senha pode ser trocada na aba **Sistema**. Esqueceu? `py
 **Configuração**: `/opt/applications/self-monitoring/config.toml`, criado a partir de `config.example.toml`
 na primeira instalação e **nunca sobrescrito** por atualizações. Depois de editar: `sudo systemctl restart self-monitoring`.
 
-**Atualizar**: `git pull && sudo ./install.sh`. Configuração e dados (`data/`) são preservados.
+**Atualizar**: na pasta do projeto, `./atualizar.sh`. Ele baixa a versão nova do GitHub, mostra o que mudou e reinstala
+do mesmo jeito que o serviço já está (root ou seu usuário). `./atualizar.sh --verificar` só diz se há versão nova.
+Configuração e dados (`data/`) são preservados. Detalhes, jeito manual e como voltar de versão: [ATUALIZAR.md](ATUALIZAR.md).
 
 **Desinstalar**: `sudo ./install.sh --uninstall` (mantém config e dados) ou `--purge` (apaga tudo).
 
@@ -291,6 +293,7 @@ A memória aparece como "VRAM (reservada)" (carve-out de 512 MB) + "GTT" (memór
 ```
 server.py                 ponto de entrada
 install.sh                instalar / atualizar / desinstalar
+atualizar.sh              baixa a versão nova (git pull) e reinstala do mesmo jeito (ver ATUALIZAR.md)
 config.example.toml       modelo de configuração (vira config.toml na instalação; config.toml não vai pro git)
 CHANGELOG.md              histórico de versões
 tests/                    testes (python3 -m unittest discover -s tests -t .)

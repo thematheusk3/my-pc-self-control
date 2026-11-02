@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.6
+- `./atualizar.sh`: baixa a versão nova do GitHub, lista o que mudou e reinstala do mesmo jeito que o serviço já
+  está (root ou seu usuário); `--verificar` só consulta, `--forcar` reinstala mesmo sem versão nova. Funciona também
+  pela cópia instalada (`/opt/applications/self-monitoring/atualizar.sh`): o instalador anota a pasta de origem.
+- [ATUALIZAR.md](ATUALIZAR.md): como atualizar, conferir a versão, resolver problemas e voltar à versão anterior.
+
 ## 0.4.5
 Trazido da versão Windows (0.5.2-win e 0.5.3-win):
 - Sistema > **Quem está acessando**: sessões abertas com aparelho, IP, origem (este PC, rede local, VPN, internet),

@@ -102,6 +102,8 @@ if [[ ! -f "$DEST/config.toml" ]]; then
   echo "Criado $DEST/config.toml a partir do exemplo (edite à vontade; atualizações não o sobrescrevem)."
 fi
 mkdir -p "$DEST/data"
+# de onde foi instalado: o atualizar.sh da cópia instalada usa para achar o clone do git
+[[ "$SRC" != "$DEST" ]] && echo "$SRC" > "$DEST/.origem"
 chown -R "$OWNER:" "$DEST"
 [[ "$RUN_AS" == root ]] || chown -R "$RUN_AS:" "$DEST/data"
 chmod 700 "$DEST/data"
