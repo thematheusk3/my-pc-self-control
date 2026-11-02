@@ -251,6 +251,7 @@ select.search { flex: 0 1 auto; }
   width: 100%; max-width: 100%; margin: auto 0 0; max-height: 85vh;
 }
 .sheet::backdrop { background: rgb(0 0 0 / .5); }
+.sheet .shot-view { display: block; width: 100%; height: auto; max-height: 60vh; object-fit: contain; border-radius: 10px; margin-top: 10px; background: var(--surface-2); }
 @media (min-width: 640px) { .sheet { border-radius: 18px; max-width: 520px; margin: auto; } }
 .sheet h2 { margin: 0 0 2px; font-size: 19px; overflow-wrap: anywhere; }
 .sheet .cmdline { font-family: var(--mono); font-size: 12px; color: var(--text-muted); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin: 10px 0; overflow-wrap: anywhere; max-height: 120px; overflow: auto; }

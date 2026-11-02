@@ -253,7 +253,8 @@ function renderShots() {
     try {
       if (b.dataset.actShot === "take") {
         b.textContent = "Capturando…";
-        await post("/api/screenshot", {}, "Captura feita (o aviso apareceu na tela do PC).");
+        const r = await post("/api/screenshot", {}, "Captura feita (o aviso apareceu na tela do PC).");
+        if (r?.name) openShot(r);
       } else {
         await post(`/api/screenshots/${b.dataset.name}/delete`, {});
       }
@@ -261,6 +262,25 @@ function renderShots() {
     } catch (err) { toast(err.message, true); renderShots(); }
     finally { taking = false; }
   };
+}
+
+// abre a captura recém-tirada por cima do painel (window.open depois de um await é bloqueado no celular)
+function openShot(s) {
+  const dlg = $("#sheet");
+  const src = `/api/screenshots/${encodeURIComponent(s.name)}?v=${s.size}`;
+  dlg.innerHTML = `
+    <h2>Captura de tela</h2>
+    <div class="muted">${esc(s.name)} · ${bytes(s.size)}</div>
+    <a href="${src}" target="_blank" rel="noopener"><img class="shot-view" src="${src}" alt="Captura recém-tirada"></a>
+    <div class="sheet-actions">
+      <a class="btn" href="${src}" target="_blank" rel="noopener">Tamanho real</a>
+      <a class="btn" href="${src}&download=1">Baixar</a>
+      <button class="btn full" data-close>Fechar</button>
+    </div>`;
+  dlg.querySelector("img").addEventListener("error", e => retryImg(e.target));
+  dlg.querySelector("[data-close]").addEventListener("click", () => dlg.close());
+  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); }, { once: true });
+  if (!dlg.open) dlg.showModal();
 }
 
 export default {

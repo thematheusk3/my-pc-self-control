@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.2
+- Captura de tela: ao capturar, a imagem abre na hora por cima do painel (com "Tamanho real" e "Baixar").
+
 ## 0.4.1
 - Correção: depois de tirar uma captura, a lista falhava com 501 `Unsupported method ('{}GET')` até dar F5.
   O servidor não lia o corpo de POSTs cujas rotas não o usam (captura, apagar captura, logout); com keep-alive
