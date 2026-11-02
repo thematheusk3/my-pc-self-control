@@ -365,13 +365,15 @@ select.search { flex: 0 1 auto; }
 .dev-pick { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; min-width: 0; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 .dev-ico { font-size: 22px; }
 .dev-name { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
-.dev-ctl { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; }
-.vol { display: flex; align-items: center; gap: 8px; flex: 1; }
+.dev-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; }
+.vol { display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 0; }
 .vol input[type=range] { flex: 1; accent-color: var(--series-1); min-width: 90px; height: 28px; }
 .vol output { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-secondary); }
 .mute { min-width: 40px; }
 .mute.on { background: var(--danger-bg); color: #fff; border-color: transparent; }
-.out-sel { flex: 0 1 200px; min-height: 34px; }
+/* no celular quebra para a linha de baixo e ocupa a largura toda, sem passar da borda */
+.out-sel { flex: 1 1 160px; min-width: 0; max-width: 100%; min-height: 34px; }
+@media (min-width: 640px) { .out-sel { flex: 0 1 220px; } }
 .mic-big { width: 100%; min-height: 52px; font-size: 15px; }
 .ddc-row { display: grid; grid-template-columns: 80px 1fr; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
 /* captura */

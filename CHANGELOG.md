@@ -3,6 +3,7 @@
 ## 0.4.3
 - Controles > Áudio: novo cartão **Mídia** no topo, com todos os players abertos (Spotify, navegador, VLC...):
   capa, faixa, progresso e ⏮ ⏯ ⏭, mais **voltar/avançar 10 s** quando o player permite.
+- Controles > Áudio: no celular o menu de saída de cada app passava da borda da tela; agora desce para a linha de baixo.
 - API: `POST /api/media` aceita `{"op": "seek", "offset": -10}` (segundos).
 - README: seção "Sistemas suportados" (feito para o CachyOS; Windows talvez no futuro).
 
