@@ -116,6 +116,8 @@ def main() -> None:
             ctx.proctrack.stop()
         if ctx.netmon:
             ctx.netmon.stop()
+        if ctx.focus:
+            ctx.focus.stop()
         srv.server_close()
 
 

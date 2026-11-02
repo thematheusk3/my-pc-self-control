@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+- Topo: horário da última atualização; "Offline · HH:MM:SS há X" quando os dados param de chegar
+  (e reconecta sozinho quando o celular acorda ou a conexão trava sem erro).
+- Captura de tela: a imagem aparece na hora, sem F5 (o painel esperava só o arquivo existir e servia o PNG
+  pela metade, que o navegador guardava em cache); a lista se atualiza sozinha.
+- Visão geral > No PC agora: janela em foco (KWin/X11) e mídia tocando (MPRIS) com tocar/pausar/pular.
+- Visão geral > Downloads Steam: progresso, velocidade e tempo restante de downloads e atualizações.
+- Topo: abas rolam em telas médias em vez de sobrepor o nome do PC.
+
 ## 0.3.0
 - Jogo atual e FPS (MangoHud): FPS, 1% low, frametime; leitura liga/desliga (desligada não custa nada).
 - Controles > Áudio: saída padrão (fone/HDMI...), volume e mudo por dispositivo, áudio por aplicativo

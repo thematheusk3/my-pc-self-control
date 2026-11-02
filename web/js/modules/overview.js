@@ -16,7 +16,9 @@ function mount(el, a) {
   el.innerHTML = `<div class="grid">
     ${card("ov-cpu", "CPU")}
     ${gpus.map((g, i) => card(`ov-gpu-${i}`, gpus.length > 1 ? `GPU ${i + 1}` : "GPU")).join("")}
+    ${card("ov-now", "No PC agora")}
     ${card("ov-game", "Jogo")}
+    ${card("ov-steam", "Downloads Steam")}
     ${card("ov-mem", "Memória")}
     ${card("ov-top", "Maiores consumidores")}
     ${card("ov-net", "Rede")}
@@ -53,6 +55,26 @@ function mount(el, a) {
     } catch (err) { toast(err.message, true); e.target.checked = !on; }
     e.target.disabled = false;
   });
+
+  // agora no PC: janela em foco + mídia
+  $("#ov-now [data-body]", el).innerHTML = `
+    <div class="now-focus" data-focus></div>
+    <div class="now-media" data-media hidden>
+      <img class="media-art" data-art alt="" hidden>
+      <div class="media-info"><div class="media-title" data-mtitle></div><div class="media-sub" data-msub></div>
+        <div class="media-prog" data-mprog><div class="meter"><i></i></div><div class="media-time" data-mtime></div></div></div>
+      <div class="media-btns" data-mbtns></div>
+    </div>
+    <div class="note" data-mnote></div>`;
+  $("[data-mbtns]", el).addEventListener("click", async e => {
+    const b = e.target.closest("button[data-op]");
+    if (!b) return;
+    b.disabled = true;
+    try { await app.api("/api/media", { method: "POST", body: { player: b.dataset.player, op: b.dataset.op } }); }
+    catch (err) { toast(err.message, true); }
+    b.disabled = false;
+  });
+  $("#ov-steam", el).hidden = true;
 
   $("#ov-mem [data-body]", el).innerHTML = `
     <div class="hero-row"><div class="hero num" data-v="pct">—</div></div>
@@ -176,6 +198,9 @@ function update(snap) {
     $("[data-game-note]", el).innerHTML = note;
   }
 
+  if (d.focus || d.media) updateNow(d.focus, d.media, snap.ts);
+  if (d.steam) updateSteam(d.steam, d.network);
+
   // Memória
   const mm = d.memory;
   if (mm) {
@@ -219,6 +244,101 @@ function update(snap) {
     $("[data-meters]", el).innerHTML = dk.partitions.map(x =>
       meter(`${x.mount} (${x.fs})`, x.used, x.total, `${bytes(x.used)} / ${bytes(x.total)}`)).join("");
   }
+}
+
+// ---------- agora no PC ----------
+const mmss = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return `${h ? `${h}:${String(m).padStart(2, "0")}` : m}:${String(s % 60).padStart(2, "0")}`; };
+const sinceTxt = t => { const s = Date.now() / 1000 - t; return s < 60 ? "agora" : s < 3600 ? `há ${Math.floor(s / 60)} min` : `há ${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
+const STATUS = { playing: ["good", "Tocando"], paused: ["", "Pausado"], stopped: ["", "Parado"] };
+
+function artSrc(p) {
+  if (!p.art) return null;
+  if (/^https?:\/\//.test(p.art)) return p.art;
+  if (p.art.startsWith("file://")) return `/api/media/art?player=${encodeURIComponent(p.id)}&v=${encodeURIComponent(p.art.slice(-40))}`;
+  return null;
+}
+
+function updateNow(f, m, ts) {
+  const el = $("#ov-now", root);
+  // janela em foco
+  const fe = $("[data-focus]", el);
+  const w = f?.window;
+  let sub = "";
+  if (!f) fe.innerHTML = "";
+  else if (!f.session) fe.innerHTML = `<div class="stat-label">Janela em foco</div><p class="muted" style="margin:2px 0">Ninguém logado no PC.</p>`;
+  else if (f.locked) fe.innerHTML = `<div class="stat-label">Janela em foco</div><p style="margin:2px 0">🔒 Sessão bloqueada</p>`;
+  else if (w) {
+    const appName = w.desktop || w.cls || w.process || "?";
+    fe.innerHTML = `<div class="stat-label">Janela em foco</div>
+      <div class="focus-title" title="${esc(w.caption)}">${esc(w.caption || appName)}</div>
+      <div class="focus-sub">${esc(appName)}${w.process && w.process !== appName ? ` · ${esc(w.process)}` : ""}${w.pid ? ` · PID ${w.pid}` : ""}${f.since ? ` · ${sinceTxt(f.since)}` : ""}${w.fullscreen ? ` <span class="chip">tela cheia</span>` : ""}</div>`;
+    sub = appName;
+  } else fe.innerHTML = `<div class="stat-label">Janela em foco</div><p class="muted" style="margin:2px 0">${f.source ? "Nenhuma janela em foco." : "Não disponível neste ambiente (precisa de KDE ou X11)."}</p>`;
+
+  // mídia
+  const me = $("[data-media]", el), note = $("[data-mnote]", el);
+  const p = m?.current;
+  me.hidden = !p;
+  if (!m) note.textContent = "";
+  else if (!p) note.innerHTML = m.players?.length ? `Player aberto (${esc(m.players.map(x => x.app).join(", "))}), nada tocando.` : "Nada tocando.";
+  else {
+    note.innerHTML = m.players.length > 1 ? `Outros players: ${esc(m.players.filter(x => x.id !== p.id).map(x => `${x.app} (${STATUS[x.status]?.[1].toLowerCase() || x.status})`).join(", "))}` : "";
+    const img = $("[data-art]", el), src = artSrc(p);
+    if (src && img.getAttribute("src") !== src) { img.hidden = false; img.src = src; img.onerror = () => { img.hidden = true; }; }
+    else if (!src) img.hidden = true;
+    $("[data-mtitle]", el).textContent = p.title;
+    $("[data-msub]", el).innerHTML = `${esc([p.artist, p.album].filter(Boolean).join(" · "))}
+      <span class="media-app">${esc(p.app)} <span class="chip ${STATUS[p.status]?.[0] || ""}">${STATUS[p.status]?.[1] || p.status}</span></span>`;
+    const prog = $("[data-mprog]", el);
+    prog.hidden = !p.length;
+    if (p.length) {
+      const pos = Math.min(p.length, (p.position || 0) + (p.status === "playing" ? Math.max(0, ts - p.at) * (p.rate || 1) : 0));
+      prog.querySelector("i").style.width = `${(pos / p.length) * 100}%`;
+      $("[data-mtime]", el).textContent = `${mmss(pos)} / ${mmss(p.length)}`;
+    }
+    const btns = $("[data-mbtns]", el);
+    const key = `${p.id}|${p.status}|${JSON.stringify(p.can)}`;
+    if (app.info.features.control && btns.dataset.key !== key) {
+      btns.dataset.key = key;
+      const pid = esc(p.id);
+      btns.innerHTML = `${p.can.previous ? `<button class="btn btn-sm" data-op="previous" data-player="${pid}" title="Anterior" aria-label="Anterior">⏮</button>` : ""}
+        ${p.can.play_pause ? `<button class="btn btn-sm" data-op="play_pause" data-player="${pid}" title="${p.status === "playing" ? "Pausar" : "Tocar"}" aria-label="${p.status === "playing" ? "Pausar" : "Tocar"}">${p.status === "playing" ? "⏸" : "▶"}</button>` : ""}
+        ${p.can.next ? `<button class="btn btn-sm" data-op="next" data-player="${pid}" title="Próxima" aria-label="Próxima">⏭</button>` : ""}`;
+    }
+    if (!sub) sub = `${p.app}: ${p.title}`;
+  }
+  $("[data-sub]", el).textContent = p ? `♪ ${p.title}${p.artist ? ` · ${p.artist}` : ""}` : sub;
+}
+
+// ---------- downloads da Steam ----------
+const DL_STATUS = { running: ["good", "Baixando"], paused: ["warning", "Pausado"], queued: ["", "Na fila"] };
+function eta(s) {
+  if (s == null) return "";
+  if (s < 60) return "menos de 1 min";
+  if (s < 3600) return `${Math.round(s / 60)} min`;
+  return `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`;
+}
+
+function updateSteam(st, net) {
+  const el = $("#ov-steam", root);
+  const list = st.downloads || [];
+  el.hidden = !list.length;
+  if (!list.length) return;
+  const active = list.filter(x => x.status === "running");
+  $("[data-sub]", el).textContent = active.length ? `${active.length} baixando${list.length > active.length ? ` · ${list.length - active.length} na fila/pausado` : ""}` : `${list.length} na fila/pausado`;
+  $("[data-chip]", el).innerHTML = active.length ? `<span class="chip good">${rate(active.reduce((a, x) => a + (x.rate || 0), 0) || null)}</span>` : "";
+  $("[data-body]", el).innerHTML = list.map(x => {
+    const [cls, lbl] = DL_STATUS[x.status] || ["", x.status];
+    const phase = x.phase && x.phase !== "baixando" ? x.phase : null;
+    const label = `${esc(x.name)} <span class="chip ${cls}">${phase ? phase[0].toUpperCase() + phase.slice(1) : lbl}</span>`;
+    const staging = phase === "instalando" && x.stage_total;
+    const v = staging ? x.stage_done : x.done, t = staging ? x.stage_total : x.total;
+    const txt = t ? `${pct(v / t * 100, 1)} · ${bytes(v)} / ${bytes(t)}` : "tamanho ainda desconhecido";
+    const extra = [x.rate ? rate(x.rate) : "", x.eta ? `faltam ~${eta(x.eta)}` : ""].filter(Boolean).join(" · ");
+    return `<div class="dl-item">${meter("", v || 0, t || 0, txt).replace('<span></span>', `<span class="dl-name">${label}</span>`)}
+      ${extra ? `<div class="dl-extra">${extra}</div>` : ""}</div>`;
+  }).join("") + `<p class="note">Lido dos arquivos da Steam (que atualizam o progresso em saltos). A velocidade é o tráfego do processo da Steam.</p>`;
 }
 
 export default { id: "overview", title: "Visão geral", icon: "▦", mount, show: () => app.snapshot && update(app.snapshot) };

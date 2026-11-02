@@ -17,7 +17,8 @@ def info(req):
                      "netmon": ctx.netmon is not None,
                      "unlock": ctx.config.allow_unlock, "launch": ctx.config.allow_launch,
                      "screenshot": ctx.config.allow_screenshot, "control": ctx.config.allow_control,
-                     "alerts": ctx.alerts is not None, "updates": ctx.updates is not None},
+                     "alerts": ctx.alerts is not None, "updates": ctx.updates is not None,
+                     "media": ctx.media is not None},
         "sample_interval": ctx.config.sample_interval,
         "process_interval": ctx.config.process_interval,
         "info": ctx.info(),
@@ -513,12 +514,14 @@ def screenshots(req):
 
 @route("GET", "/api/screenshots/<name>")
 def screenshot_file(req, name):
-    from ..screenshot import path_of
+    from ..screenshot import path_of, png_complete
     if not req.ctx.config.allow_screenshot:
         return Response({"error": "desativado"}, 403)
     p = path_of(name)
     if not p:
         return Response({"error": "não encontrada"}, 404)
+    if not png_complete(p):    # ainda sendo gravada: não deixa o navegador guardar a imagem quebrada
+        return Response({"error": "captura ainda sendo gravada"}, 503, {"Retry-After": "1"})
     hdr = {"Content-Type": "image/png", "Cache-Control": "private, max-age=3600"}
     if req.query.get("download"):
         hdr["Content-Disposition"] = f'attachment; filename="{p.name}"'
@@ -529,3 +532,32 @@ def screenshot_file(req, name):
 def screenshot_delete(req, name):
     from ..screenshot import delete
     return {"ok": delete(name)}
+
+
+# ---------- mídia (MPRIS) ----------
+@route("POST", "/api/media")
+def media_control(req):
+    from ..media import MediaError
+    if not req.ctx.media:
+        return Response({"error": "Leitura de mídia indisponível."}, 404)
+    if not req.ctx.config.allow_control:
+        return Response({"error": "Controles desativados (security.allow_control)."}, 403)
+    body = req.json() or {}
+    try:
+        return req.ctx.media.control(str(body.get("player", "")), str(body.get("op", "")))
+    except MediaError as e:
+        return Response({"error": str(e)}, e.status)
+
+
+@route("GET", "/api/media/art")
+def media_art(req):
+    from ..media import MediaError
+    if not req.ctx.media:
+        return Response({"error": "indisponível"}, 404)
+    try:
+        r = req.ctx.media.art_file(req.query.get("player", [""])[0])
+    except MediaError as e:
+        return Response({"error": str(e)}, e.status)
+    if not r:
+        return Response({"error": "sem capa"}, 404)
+    return Response(r[0], 200, {"Content-Type": r[1], "Cache-Control": "private, max-age=600"})

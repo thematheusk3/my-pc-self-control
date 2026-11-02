@@ -19,6 +19,8 @@ Funciona em PCs comuns (AMD, Intel, NVIDIA) e tem tratamento específico para a 
   apagar/espera) e captura de tela (sempre com aviso no PC).
 - **Alertas**: regras configuráveis com aviso no painel, na tela do PC e no celular (ntfy).
 - **Jogo/FPS** (na Visão geral): jogo aberto e FPS via MangoHud.
+- **No PC agora** (na Visão geral): janela em foco e o que está tocando (Spotify, navegador, VLC...), com tocar/pausar/pular.
+- **Downloads Steam** (na Visão geral, só quando há algo baixando): progresso, velocidade e tempo restante.
 - **Apps**: abre pelo celular, na tela do PC, os aplicativos e jogos instalados.
 - **Rede**: conexões por programa (para onde, quanto envia/recebe), conexões encerradas e portas abertas.
 - **Sensores**: todos os sensores hwmon (temperaturas, ventoinhas, tensões), agrupados por chip.
@@ -26,7 +28,8 @@ Funciona em PCs comuns (AMD, Intel, NVIDIA) e tem tratamento específico para a 
   com perfis prontos), **manual** (velocidade fixa) ou **placa** (devolve o controle ao firmware).
 - **Sistema**: informações do host e do próprio monitor; **desligar/reiniciar** a máquina (com confirmação e opção de forçar).
 
-Gráficos com os últimos 5 minutos, atualização em tempo real (SSE, 1 s), tema claro/escuro,
+Gráficos com os últimos 5 minutos, atualização em tempo real (SSE, 1 s; o topo mostra o horário da última
+atualização e fica vermelho com "Offline · HH:MM:SS há X" se os dados pararem de chegar), tema claro/escuro,
 layout próprio para celular (abas embaixo) e PC (grade de 3 colunas). Pode ser adicionado à tela
 inicial do celular ("Adicionar à tela inicial").
 
@@ -184,6 +187,26 @@ O `install.sh` adiciona o usuário ao grupo `i2c` para o DDC funcionar mesmo sem
 Se a notificação não puder ser exibida, a captura é recusada. Usa o Spectacle (KDE/Wayland).
 As últimas 30 capturas ficam em `data/screenshots/` (só o usuário do serviço lê). Desative com
 `security.allow_screenshot = false`.
+A lista se atualiza sozinha (inclusive capturas feitas por outro aparelho); o painel só entrega a imagem
+depois que o Spectacle termina de gravar o arquivo.
+
+## No PC agora: janela em foco e mídia
+
+**Janela em foco**: no Wayland um programa comum não enxerga as janelas dos outros, então o painel carrega
+no KWin um script pequeno (`data/kwin-focus.js`, nome `self-monitoring-focus`) que, a cada troca de janela,
+escreve uma linha `SMFOCUS {...}` no log do KWin; o painel acompanha o journal do usuário. Mudanças só de
+título (terminal, player) são enviadas no máximo a cada 10 s. Ao parar o serviço o script é descarregado.
+Fora do KDE, em sessões X11, usa o `xprop`. Para desligar: `collectors.disabled = ["focus"]`.
+
+**Mídia**: lê os players MPRIS do D-Bus da sessão (`busctl`): título, artista, álbum, capa e posição.
+Os botões ⏮ ⏯ ⏭ seguem `security.allow_control`. Desligar: `collectors.disabled = ["media"]`.
+
+## Downloads da Steam
+
+A Steam não tem API local de progresso; o painel junta o `logs/content_log.txt` (estado: baixando,
+pausado, na fila, instalando...) e os `steamapps/appmanifest_<id>.acf` (bytes baixados/total). A Steam
+atualiza esses números em saltos, então a barra anda aos pulos. A velocidade é o tráfego do processo
+`steam` no monitor de rede (sem ele, a variação dos bytes baixados). O cartão só aparece com algo na fila.
 
 ## Alertas
 
@@ -273,12 +296,15 @@ sm/
   alerts.py               regras de alerta, histórico e canais (PC, ntfy)
   screenshot.py           captura de tela com aviso obrigatório no PC
   updates.py              atualizações pendentes
+  focus.py                janela em foco (script no KWin + journal; xprop no X11)
+  media.py                o que está tocando (MPRIS via busctl) e controles
+  steamdl.py              downloads/atualizações da Steam (content_log + appmanifest)
 tools/login-pelo-celular.sh  liga/desliga o login automático com a sessão bloqueada
 tools/simular-suspeito.sh processos inofensivos que imitam malware (para testar a aba Suspeitos)
   auth.py                 senha (hash scrypt), sessões e limite de tentativas
   api/routes.py           endpoints REST
   collectors/             UM ARQUIVO POR COLETOR (carregados automaticamente)
-    cpu.py gpu.py memory.py disks.py network.py sensors.py processes.py system.py
+    cpu.py gpu.py memory.py disks.py network.py sensors.py processes.py system.py focus.py media.py steam.py
   hw/
     hwmon.py              leitura genérica de /sys/class/hwmon com filtro de valores absurdos
     gpu.py                backends de GPU: AmdGpu, NvidiaGpu, IntelGpu

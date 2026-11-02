@@ -57,21 +57,64 @@ function updateBell(al) {
   lastAlertSeq = seq;
 }
 
-function setLive(state) {
+// indicador de conexão + horário da última atualização (para saber desde quando está offline)
+const STALE_AFTER = 5;     // s sem snapshot = dados parados
+let lastRecv = 0, lastTs = 0, es = null;
+
+const hhmmss = t => new Date(t * 1000).toLocaleTimeString("pt-BR");
+function ago(sec) {
+  if (sec < 60) return `${Math.round(sec)} s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)} min`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)} h ${Math.floor((sec % 3600) / 60)} min`;
+  return `${Math.floor(sec / 86400)} d`;
+}
+
+function renderLive() {
   const el = $("#live");
+  const now = Date.now() / 1000;
+  const stale = !lastRecv || now - lastRecv > STALE_AFTER;
+  const connected = es && es.readyState === EventSource.OPEN;
+  let state, label, title;
+  if (!lastTs) { state = ""; label = "Conectando"; title = "Conectando ao PC"; }
+  else if (!stale && connected) {
+    state = "on"; label = `Ao vivo · ${hhmmss(lastTs)}`; title = `Última atualização: ${new Date(lastTs * 1000).toLocaleString("pt-BR")}`;
+  } else {
+    state = "off";
+    label = `Offline · ${hhmmss(lastTs)}`;
+    title = `Sem dados há ${ago(now - lastRecv)}. Última atualização do PC: ${new Date(lastTs * 1000).toLocaleString("pt-BR")}`;
+  }
   el.className = `live ${state}`;
-  el.querySelector(".live-label").textContent = { on: "Ao vivo", off: "Reconectando", "": "Conectando" }[state];
+  el.title = title;
+  el.querySelector(".live-label").textContent = label;
+  el.querySelector(".live-ago").textContent = state === "off" ? `há ${ago(now - lastRecv)}` : "";
+  document.body.classList.toggle("stale", state === "off");
 }
 
 function connect() {
-  const es = new EventSource("/api/stream");
-  es.onopen = () => setLive("on");
-  es.onmessage = e => app.pushSnapshot(JSON.parse(e.data));
+  es?.close();
+  es = new EventSource("/api/stream");
+  es.onopen = renderLive;
+  es.onmessage = e => {
+    const snap = JSON.parse(e.data);
+    lastRecv = Date.now() / 1000;
+    lastTs = snap.ts || lastRecv;
+    app.pushSnapshot(snap);
+    renderLive();
+  };
   es.onerror = () => {
-    setLive("off");
+    renderLive();
     // EventSource reconecta sozinho; checa se a sessão expirou
     app.api("/api/info").catch(() => {});
   };
+}
+
+// celular que dormiu/aba em segundo plano: a conexão pode "morrer" sem erro; reconecta ao voltar
+function watchdog() {
+  setInterval(renderLive, 1000);
+  setInterval(() => { if (lastRecv && Date.now() / 1000 - lastRecv > 20) connect(); }, 10000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && lastRecv && Date.now() / 1000 - lastRecv > STALE_AFTER) connect();
+  });
 }
 
 function setupTheme() {
@@ -126,7 +169,10 @@ async function main() {
     document.title = `${sys.hostname} · Self Monitoring`;
     setupRouter();
     app.pushSnapshot(snap);
+    lastRecv = Date.now() / 1000;
+    lastTs = snap.ts || lastRecv;
     connect();
+    watchdog();
   } catch (e) {
     toast(`Erro ao conectar: ${e.message}`, true);
   }

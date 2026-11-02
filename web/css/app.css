@@ -73,6 +73,12 @@ button { font: inherit; color: inherit; }
 .live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .live.on .dot { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
 .live.off .dot { background: var(--critical); }
+.live.off { color: var(--critical); font-weight: 600; }
+.live-label { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.live-ago { font-variant-numeric: tabular-nums; white-space: nowrap; opacity: .8; }
+.live-ago:empty { display: none; }
+body.stale #views { opacity: .7; transition: opacity .3s; }
+@media (max-width: 420px) { .live-ago { display: none; } }
 
 /* tabs: barra inferior no celular, abas no topo no PC */
 .tabs {
@@ -91,12 +97,13 @@ button { font: inherit; color: inherit; }
 
 @media (min-width: 900px) {
   body { padding-bottom: 0; }
-  .tabs { position: static; height: auto; padding: 0; background: none; border: 0; gap: 4px; flex: none; }
+  .tabs { position: static; height: auto; padding: 0; background: none; border: 0; gap: 4px; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
   .tab { flex-direction: row; gap: 6px; font-size: 14px; white-space: nowrap; padding: 8px 14px; border-radius: 10px; }
   .tab .ico { font-size: 15px; }
   .tab:hover { background: var(--surface-2); color: var(--text-primary); }
   .tab[aria-current="page"] { background: var(--surface-2); color: var(--text-primary); }
-  .brand { flex: 1; }
+  .brand { flex: 1; overflow: hidden; min-width: 28px; }
+  .top-actions .live { white-space: nowrap; }
   .top-actions { flex: 1; justify-content: flex-end; }
 }
 
@@ -391,3 +398,27 @@ select.search { flex: 0 1 auto; }
 .rule-val { display: flex; width: fit-content; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
 .rule-val .search { width: 76px; min-height: 32px; flex: none; }
 .rule-help { font-size: 12px; margin-top: 4px; }
+
+/* ---------- agora no PC (janela em foco + mídia) ---------- */
+.focus-title { font-weight: 600; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.now-media { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; margin-top: 14px;
+  padding-top: 12px; border-top: 1px solid var(--border); }
+.media-art { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: var(--track); }
+.media-art[hidden] + .media-info { grid-column: 1 / -1; }
+.media-info { min-width: 0; }
+.media-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.media-app { display: flex; gap: 6px; align-items: center; margin-top: 4px; color: var(--text-muted); }
+.media-prog { margin-top: 8px; }
+.media-prog .meter { height: 4px; }
+.media-prog .meter > i { transition: width 1s linear; }
+.media-time { font-size: 11px; color: var(--text-muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.media-btns { grid-column: 1 / -1; display: flex; gap: 8px; }
+.media-btns:empty { display: none; }
+.media-btns .btn { flex: 1; font-size: 16px; }
+
+/* ---------- downloads da Steam ---------- */
+.dl-item + .dl-item { margin-top: 6px; }
+.dl-name { display: inline-flex; gap: 6px; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary, inherit); font-weight: 600; }
+.dl-extra { font-size: 12px; color: var(--text-muted); margin-top: 3px; font-variant-numeric: tabular-nums; }

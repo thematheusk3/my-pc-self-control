@@ -54,7 +54,7 @@ async function refresh(first) {
       disp = await app.api("/api/display");
       if (first || !ddc) app.api("/api/display/ddc").then(r => { ddc = r.monitors; renderDisplay(); }).catch(e => { ddc = { error: e.message }; renderDisplay(); });
       renderDisplay();
-    } else if (view === "shot" && first) { shots = (await app.api("/api/screenshots")).shots; renderShots(); }
+    } else if (view === "shot") { await loadShots(first); }
   } catch (e) {
     $("[data-body]", root).innerHTML = `<div class="card empty">${esc(e.message)}</div>`;
   }
@@ -211,6 +211,26 @@ async function displayAct(d, b) {
 }
 
 // ---------- captura ----------
+const shotKey = list => (list || []).map(s => `${s.name}:${s.size}`).join("|");
+let taking = false;
+
+// recarrega a lista (também a cada 5 s, para capturas feitas por outro aparelho); só redesenha se mudou
+async function loadShots(force) {
+  if (taking && !force) return;
+  const list = (await app.api("/api/screenshots")).shots;
+  if (!force && shotKey(list) === shotKey(shots)) return;
+  shots = list;
+  renderShots();
+}
+
+// imagem que falhou (ex.: ainda sendo gravada): tenta de novo algumas vezes
+function retryImg(img) {
+  const n = Number(img.dataset.retry || 0);
+  if (n >= 5) return;
+  img.dataset.retry = n + 1;
+  setTimeout(() => { img.src = `${img.src.split("&r=")[0]}&r=${n + 1}`; }, 800 * (n + 1));
+}
+
 function renderShots() {
   $("[data-body]", root).innerHTML = `
     <article class="card">
@@ -219,24 +239,27 @@ function renderShots() {
       <p class="note">Toda captura mostra antes um aviso visível na tela do PC. Se o aviso não puder aparecer, a captura não é feita. As últimas 30 ficam guardadas no PC.</p>
     </article>
     <div class="shots">${(shots || []).map(s => `<figure class="card shot">
-        <a href="/api/screenshots/${s.name}" target="_blank" rel="noopener"><img src="/api/screenshots/${s.name}" alt="Captura de ${new Date(s.time * 1000).toLocaleString("pt-BR")}" loading="lazy"></a>
+        <a href="/api/screenshots/${s.name}?v=${s.size}" target="_blank" rel="noopener"><img src="/api/screenshots/${s.name}?v=${s.size}" alt="Captura de ${new Date(s.time * 1000).toLocaleString("pt-BR")}" loading="lazy"></a>
         <figcaption><span>${new Date(s.time * 1000).toLocaleString("pt-BR")} · ${bytes(s.size)}</span>
           <span><a class="btn btn-sm" href="/api/screenshots/${s.name}?download=1">Baixar</a>
           <button class="btn btn-sm btn-ghost-danger" data-act-shot="del" data-name="${s.name}">Apagar</button></span></figcaption>
       </figure>`).join("")}</div>`;
+  $("[data-body]", root).querySelectorAll(".shot img").forEach(img => img.addEventListener("error", () => retryImg(img)));
   $("[data-body]", root).onclick = async e => {
     const b = e.target.closest("[data-act-shot]");
     if (!b) return;
     b.disabled = true;
-    if (b.dataset.actShot === "take") {
-      b.textContent = "Capturando…";
-      const r = await post("/api/screenshot", {}, "Captura feita (o aviso apareceu na tela do PC).");
-      if (r) shots = (await app.api("/api/screenshots")).shots;
-    } else {
-      await post(`/api/screenshots/${b.dataset.name}/delete`, {});
-      shots = (await app.api("/api/screenshots")).shots;
-    }
-    renderShots();
+    taking = true;
+    try {
+      if (b.dataset.actShot === "take") {
+        b.textContent = "Capturando…";
+        await post("/api/screenshot", {}, "Captura feita (o aviso apareceu na tela do PC).");
+      } else {
+        await post(`/api/screenshots/${b.dataset.name}/delete`, {});
+      }
+      await loadShots(true);
+    } catch (err) { toast(err.message, true); renderShots(); }
+    finally { taking = false; }
   };
 }
 

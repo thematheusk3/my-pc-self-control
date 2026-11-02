@@ -19,7 +19,8 @@ from .desktop import graphical_session, notify_pc, session_env
 log = logging.getLogger(__name__)
 DIR = ROOT / "data" / "screenshots"
 KEEP = 30            # mantém as últimas N capturas
-_NAME = re.compile(r"^shot-\d{8}-\d{6}\.png$")
+_NAME = re.compile(r"^shot-\d{8}-\d{6}(?:-\d{1,3})?\.png$")
+PNG_END = b"IEND\xaeB`\x82"     # último chunk de um PNG completo
 
 
 class ShotError(Exception):
@@ -41,7 +42,12 @@ def take(requested_by: str) -> dict:
     # 2) captura
     DIR.mkdir(parents=True, exist_ok=True)
     DIR.chmod(0o700)
-    name = time.strftime("shot-%Y%m%d-%H%M%S.png")
+    stem = time.strftime("shot-%Y%m%d-%H%M%S")
+    name = f"{stem}.png"
+    n = 1
+    while (DIR / name).exists():      # duas capturas no mesmo segundo
+        name = f"{stem}-{n}.png"
+        n += 1
     path = DIR / name
     cmd = ["systemd-run", "--user", "--wait", "--collect", "--quiet", "-p", "Type=exec", "--",
            "spectacle", "--background", "--nonotify", "--fullscreen", "--output", str(path)]
@@ -49,15 +55,34 @@ def take(requested_by: str) -> dict:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=session_env())
     except (OSError, subprocess.SubprocessError) as e:
         raise ShotError(f"Falha ao capturar: {e}", 500) from None
-    for _ in range(20):        # o Spectacle grava em segundo plano
-        if path.exists() and path.stat().st_size > 0:
-            break
-        time.sleep(0.25)
-    if not path.exists():
+    if not _wait_complete(path):
+        path.unlink(missing_ok=True)
         raise ShotError(f"O Spectacle não gerou a imagem. {r.stderr.strip()[:200]}", 500)
     log.warning("captura de tela feita pelo painel (pedido de %s): %s", requested_by, name)
     _prune()
     return {"ok": True, "name": name, "size": path.stat().st_size}
+
+
+def png_complete(path: Path) -> bool:
+    try:
+        with open(path, "rb") as f:
+            if f.read(8) != b"\x89PNG\r\n\x1a\n":
+                return False
+            f.seek(-8, 2)
+            return f.read(8) == PNG_END
+    except OSError:
+        return False
+
+
+def _wait_complete(path: Path, timeout: float = 15.0) -> bool:
+    """O Spectacle grava em segundo plano: espera o PNG terminar (chunk IEND no fim).
+    Sem isso o painel podia servir um arquivo pela metade (imagem quebrada até dar F5)."""
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if png_complete(path):
+            return True
+        time.sleep(0.2)
+    return False
 
 
 def _prune() -> None:
@@ -69,8 +94,9 @@ def _prune() -> None:
 def list_shots() -> list[dict]:
     if not DIR.is_dir():
         return []
-    return [{"name": f.name, "size": f.stat().st_size, "time": f.stat().st_mtime}
-            for f in sorted(DIR.glob("shot-*.png"), reverse=True)]
+    files = [f for f in DIR.glob("shot-*.png") if _NAME.match(f.name)]
+    files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+    return [{"name": f.name, "size": f.stat().st_size, "time": f.stat().st_mtime} for f in files]
 
 
 def path_of(name: str) -> Path | None:

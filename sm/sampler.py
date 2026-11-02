@@ -34,6 +34,8 @@ class Context:
         self.alerts = None      # Alerts
         self.updates = None     # Updates
         self.power_timer = None # PowerTimer
+        self.media = None       # Media (MPRIS), criado pelo coletor "media"
+        self.focus = None       # FocusMonitor, criado pelo coletor "focus"
 
     def snapshot(self) -> dict:
         return {"ts": self.ts, "seq": self.seq, "series": dict(self.history.latest), "data": self.data}
