@@ -5,6 +5,18 @@ Backend em Python (só biblioteca padrão + `psutil`), frontend em HTML/JS puro 
 
 Funciona em PCs comuns (AMD, Intel, NVIDIA) e tem tratamento específico para a **AMD BC-250**.
 
+## Sistemas suportados
+
+O projeto é feito e testado no **[CachyOS](https://cachyos.org) com KDE Plasma 6 (Wayland)**.
+
+| Sistema | Situação |
+|---|---|
+| **CachyOS** (KDE Plasma) | Suportado: é onde o projeto é desenvolvido e testado. |
+| Arch Linux, EndeavourOS, Manjaro e outros baseados em Arch, com KDE Plasma 6 | Deve funcionar por completo (mesmos pacotes, `pacman`/AUR). Não testado. |
+| Outras distros com systemd (Debian/Ubuntu, Fedora, openSUSE...) com KDE Plasma 6 | Funciona em grande parte: o instalador usa `apt`/`dnf`/`zypper` e as atualizações pendentes usam `apt`/`dnf`. Não testado. |
+| Linux com outro ambiente gráfico (GNOME, XFCE...) | Monitoramento, processos, rede, sensores, ventoinha, áudio, mídia, alertas e desligar funcionam. Ficam de fora o que depende do KDE: resolução da tela (`kscreen-doctor`), captura (Spectacle), abrir apps (`kioclient`), janela em foco no Wayland (KWin; no X11 usa `xprop`) e o login pelo celular (plasmalogin/SDDM). |
+| Windows | Não suportado. Uma versão para Windows pode ser implementada no futuro. |
+
 ## O que mostra
 
 - **Visão geral**: CPU (uso total, por thread, clock, temperatura, load), GPU (uso, temperatura,
