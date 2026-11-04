@@ -34,14 +34,16 @@ Situação em: versão Linux 0.4.6, versão Windows 0.6.0-win.
 Vale fazer depois de aprovar a interface no Windows. Quase tudo é frontend, e os nomes das classes foram mantidos.
 
 1. No Linux, guarde a interface atual antes de mudar: `git tag -a ui-classica-0.4.6 -m "Interface antiga" && git push origin ui-classica-0.4.6`.
-2. Gere o diff no repositório do Windows e aplique no do Linux. Resolva os conflitos à mão, porque os módulos têm textos diferentes:
+2. Copie inteiros do Windows: `web/css/app.css` (tem todas as classes do CSS do Linux), `web/icon.svg` e a pasta `web/fonts/`.
+3. Para o restante, gere o diff no repositório do Windows e aplique no do Linux. Testado na 0.4.6: 11 de 17 arquivos entram limpos e 13 trechos ficam em `.rej` (`media.js`, `apps.js`, `controls.js`, `net.js`, `overview.js`, `system.js`), quase todos trocas de emoji por `ic(...)`. Aplique esses à mão e apague os `.rej`. Os dois repositórios não têm histórico comum, então `--3way` não funciona:
    ```bash
-   git diff ui-classica-0.5.3 v0.6.0-win -- web > /tmp/ui.patch   # no repositório do Windows
-   git apply --3way /tmp/ui.patch                                 # no repositório do Linux
+   # no repositório do Windows
+   git diff ui-classica-0.5.3 v0.6.0-win -- web ':!web/css/app.css' ':!web/fonts' ':!web/icon.svg' > /tmp/ui.patch
+   # no repositório do Linux
+   git apply --reject --whitespace=nowarn /tmp/ui.patch
    ```
-3. Arquivos novos, que entram inteiros: `web/fonts/archivo.woff2`, `web/fonts/OFL.txt` e `web/js/icons.js`.
 4. No `sm/server.py`, repita as três mudanças: constante `FONT`, somada a `PUBLIC` e à lista liberada antes do cadastro da senha (senão o login fica sem a fonte); cache longo para `.woff2` em `_static`; `request_queue_size = 128`.
-5. Só no Linux: em `fan.js`, troque o ícone por `icon: ic("fan")` (já incluído em `icons.js`). O CSS novo tem todas as classes do CSS do Linux e pode ser copiado inteiro. A aba Ventoinha entra no "Mais" do celular, e os estilos `.fan-*` já estão no CSS novo.
+5. Só no Linux: em `fan.js`, troque o ícone por `icon: ic("fan")` (já incluído em `icons.js`). A aba Ventoinha entra no "Mais" do celular, e os estilos `.fan-*` já estão no CSS novo.
 6. A faixa de estado cita a temperatura da CPU quando existe. No Linux ela vem do hwmon, então "Sem leitura de temperatura" não deve aparecer.
 7. Confira nos dois temas, no PC e no celular, e mova esta linha para "Já equalizado".
 
