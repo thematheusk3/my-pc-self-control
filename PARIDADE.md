@@ -10,12 +10,14 @@ backend de cada sistema.
 **Regra:** ao implementar algo novo em uma versão, registre aqui se dá para levar para a outra (e como), ou se é
 impossível (e por quê). Quando for portado, mova a linha para "Já equalizado" e anote a versão.
 
-Situação em: versão Linux 0.4.6, versão Windows 0.5.3-win.
+Situação em: versão Linux 0.4.6, versão Windows 0.6.0-win.
 
 ## 1. Só no Windows: dá para levar ao Linux
 
 | Recurso | Como foi feito no Windows | Como fazer no Linux | Esforço |
 |---|---|---|---|
+| **Interface repaginada** (0.6.0-win, **aguardando aprovação**: portar só se agradar no Windows) | Tema "placa do PC", faixa de estado com LEDs por thread, barra lateral, "Mais" no celular, ícones SVG, fonte própria. Mesmas funções e mesma API | Ver "Levar a interface repaginada ao Linux", logo abaixo desta tabela | Baixo a médio |
+| **Servidor aceita rajadas de pedidos** (0.6.0-win) | `request_queue_size = 128` na classe `Server` do `sm/server.py`; com o padrão (5), o Windows recusava conexões ao carregar a página | A mesma linha no `sm/server.py`. No Linux o sintoma é mais raro, mas a linha é inofensiva | Baixo |
 | Nome real do monitor e tipo de conexão (ex.: "LG ULTRAGEAR · DisplayPort") e chip "principal" | DisplayConfig (Win32) | Ler o EDID em `/sys/class/drm/card*-*/edid` (nome no descritor 0xFC); o `kscreen-doctor -j` já informa a saída primária | Baixo |
 | Escala da tela em % no cartão do monitor | `GetDpiForMonitor` | O `kscreen-doctor -j` já devolve `scale`; só formatar como % no frontend | Baixo |
 | Uso da GPU por tipo de engine (3D, cópia, vídeo) | Contadores "GPU Engine" | O fdinfo do DRM já separa engines (`gfx`, `compute`, `dec`, `enc`); expor em `gpu.engines` | Baixo |
@@ -26,6 +28,26 @@ Situação em: versão Linux 0.4.6, versão Windows 0.5.3-win.
 | Atualizações que pedem reinício | Campo `RebootRequired` do Windows Update | Comparar `uname -r` com o kernel instalado em `/usr/lib/modules`; `needs-restarting` no Fedora; `/var/run/reboot-required` no Debian/Ubuntu | Baixo |
 | Aviso de rede "Pública" bloqueando o acesso pelo celular | `Get-NetConnectionProfile` no instalador | O `install.sh` já libera a porta no `ufw`/`firewalld`; falta avisar quando há outro firewall (`nftables`/`iptables` com política DROP) | Baixo |
 | Captura de tela sem programa externo | GDI (BitBlt) + encoder PNG próprio | No Wayland só pelo portal (`org.freedesktop.portal.Screenshot`) ou Spectacle; manter o Spectacle | — (não vale) |
+
+### Levar a interface repaginada ao Linux
+
+Vale fazer depois de aprovar a interface no Windows. Quase tudo é frontend, e os nomes das classes foram mantidos.
+
+1. No Linux, guarde a interface atual antes de mudar: `git tag -a ui-classica-0.4.6 -m "Interface antiga" && git push origin ui-classica-0.4.6`.
+2. Gere o diff no repositório do Windows e aplique no do Linux. Resolva os conflitos à mão, porque os módulos têm textos diferentes:
+   ```bash
+   git diff ui-classica-0.5.3 v0.6.0-win -- web > /tmp/ui.patch   # no repositório do Windows
+   git apply --3way /tmp/ui.patch                                 # no repositório do Linux
+   ```
+3. Arquivos novos, que entram inteiros: `web/fonts/archivo.woff2`, `web/fonts/OFL.txt` e `web/js/icons.js`.
+4. No `sm/server.py`, repita as três mudanças: constante `FONT`, somada a `PUBLIC` e à lista liberada antes do cadastro da senha (senão o login fica sem a fonte); cache longo para `.woff2` em `_static`; `request_queue_size = 128`.
+5. Só no Linux: em `fan.js`, troque o ícone por `icon: ic("fan")` (já incluído em `icons.js`). O CSS novo tem todas as classes do CSS do Linux e pode ser copiado inteiro. A aba Ventoinha entra no "Mais" do celular, e os estilos `.fan-*` já estão no CSS novo.
+6. A faixa de estado cita a temperatura da CPU quando existe. No Linux ela vem do hwmon, então "Sem leitura de temperatura" não deve aparecer.
+7. Confira nos dois temas, no PC e no celular, e mova esta linha para "Já equalizado".
+
+Não precisa portar: a correção dos ícones de apps em `sm/desktop.py` (`HBITMAP`) é específica do Windows.
+
+Para voltar atrás no Linux: `git restore --source=ui-classica-0.4.6 -- web`, seguido do `atualizar.sh` ou `install.sh`.
 
 ## 2. Só no Linux: dá para levar ao Windows
 
