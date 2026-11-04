@@ -10,7 +10,7 @@ backend de cada sistema.
 **Regra:** ao implementar algo novo em uma versão, registre aqui se dá para levar para a outra (e como), ou se é
 impossível (e por quê). Quando for portado, mova a linha para "Já equalizado" e anote a versão.
 
-Situação em: versão Linux 0.4.6, versão Windows 0.6.0-win.
+Situação em: versão Linux 0.4.6, versão Windows 0.7.0-win.
 
 ## 1. Só no Windows: dá para levar ao Linux
 
@@ -18,6 +18,7 @@ Situação em: versão Linux 0.4.6, versão Windows 0.6.0-win.
 |---|---|---|---|
 | **Interface repaginada** (0.6.0-win, **aguardando aprovação**: portar só se agradar no Windows) | Tema "placa do PC", faixa de estado com LEDs por thread, barra lateral, "Mais" no celular, ícones SVG, fonte própria. Mesmas funções e mesma API | Ver "Levar a interface repaginada ao Linux", logo abaixo desta tabela | Baixo a médio |
 | **Servidor aceita rajadas de pedidos** (0.6.0-win) | `request_queue_size = 128` na classe `Server` do `sm/server.py`; com o padrão (5), o Windows recusava conexões ao carregar a página | A mesma linha no `sm/server.py`. No Linux o sintoma é mais raro, mas a linha é inofensiva | Baixo |
+| **Aba Atualização e aviso de versão nova** (0.7.0-win) | `sm/selfupdate.py` compara `__version__` com o `sm/__init__.py` do GitHub e traz o `CHANGELOG.md`; rotas `GET /api/panel-update` e `POST /api/panel-update/check`; `[update]` no config; `web/js/modules/update.js` marca "Nova" na navegação | Ver "Levar a aba Atualização ao Linux", abaixo desta tabela | Baixo |
 | Nome real do monitor e tipo de conexão (ex.: "LG ULTRAGEAR · DisplayPort") e chip "principal" | DisplayConfig (Win32) | Ler o EDID em `/sys/class/drm/card*-*/edid` (nome no descritor 0xFC); o `kscreen-doctor -j` já informa a saída primária | Baixo |
 | Escala da tela em % no cartão do monitor | `GetDpiForMonitor` | O `kscreen-doctor -j` já devolve `scale`; só formatar como % no frontend | Baixo |
 | Uso da GPU por tipo de engine (3D, cópia, vídeo) | Contadores "GPU Engine" | O fdinfo do DRM já separa engines (`gfx`, `compute`, `dec`, `enc`); expor em `gpu.engines` | Baixo |
@@ -28,6 +29,20 @@ Situação em: versão Linux 0.4.6, versão Windows 0.6.0-win.
 | Atualizações que pedem reinício | Campo `RebootRequired` do Windows Update | Comparar `uname -r` com o kernel instalado em `/usr/lib/modules`; `needs-restarting` no Fedora; `/var/run/reboot-required` no Debian/Ubuntu | Baixo |
 | Aviso de rede "Pública" bloqueando o acesso pelo celular | `Get-NetConnectionProfile` no instalador | O `install.sh` já libera a porta no `ufw`/`firewalld`; falta avisar quando há outro firewall (`nftables`/`iptables` com política DROP) | Baixo |
 | Captura de tela sem programa externo | GDI (BitBlt) + encoder PNG próprio | No Wayland só pelo portal (`org.freedesktop.portal.Screenshot`) ou Spectacle; manter o Spectacle | — (não vale) |
+
+### Levar a aba Atualização ao Linux
+
+Só consulta o GitHub; não instala nada. Faça depois da interface repaginada, porque `update.js` usa `icons.js` e os estilos novos.
+
+1. Copie `sm/selfupdate.py`, `web/js/modules/update.js` e `tests/test_selfupdate.py`. Em `update.js` nada muda: repositório e comandos vêm do backend.
+2. Em `sm/selfupdate.py`, troque o que é do sistema: `UPDATE_STEPS = ["/opt/applications/self-monitoring/atualizar.sh"]` (a cópia instalada funciona de qualquer pasta) e um `UPDATE_NOTE` próprio.
+3. Em `sm/config.py`, acrescente `update_check` e `update_repo` (padrão `thematheusk3/my-pc-self-control`) e a leitura de `[update]`. Em `config.example.toml`, a seção `[update]`.
+4. No `server.py`, crie `ctx.selfupdate = SelfUpdate(cfg.update_repo, cfg.update_check)`; em `sm/sampler.py`, `self.selfupdate = None`. Em `sm/api/routes.py`, as duas rotas.
+5. Em `web/js/modules/index.js`, registre `update`. Com 9 módulos mais a Ventoinha, o "Mais" do celular fica com duas linhas, o que o CSS já comporta. Em `system.js`, faça a versão apontar para `#update`.
+6. Traga o bloco "Atualização do painel" e `.tab-flag` de `app.css` (se o CSS novo for copiado inteiro, já vêm), e o ícone `arrow-circle-up` em `icons.js`.
+7. Confira se o `install.sh` copia o `CHANGELOG.md` para a pasta instalada: é dele que sai o changelog quando o GitHub não responde. O formato (`## 0.4.6`) e a versão sem sufixo já funcionam com o código atual.
+
+Limitação nas duas versões: a comparação é pelo número da versão. Um commit que não aumenta `__version__` não gera aviso.
 
 ### Levar a interface repaginada ao Linux
 
