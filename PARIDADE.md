@@ -10,7 +10,7 @@ backend de cada sistema.
 **Regra:** ao implementar algo novo em uma versão, registre aqui se dá para levar para a outra (e como), ou se é
 impossível (e por quê). Quando for portado, mova a linha para "Já equalizado" e anote a versão.
 
-Situação em: versão Linux 0.4.6, versão Windows 0.7.0-win.
+Situação em: versão Linux 0.4.6, versão Windows 0.8.0-win.
 
 ## 1. Só no Windows: dá para levar ao Linux
 
@@ -19,6 +19,8 @@ Situação em: versão Linux 0.4.6, versão Windows 0.7.0-win.
 | **Interface repaginada** (0.6.0-win, **aguardando aprovação**: portar só se agradar no Windows) | Tema "placa do PC", faixa de estado com LEDs por thread, barra lateral, "Mais" no celular, ícones SVG, fonte própria. Mesmas funções e mesma API | Ver "Levar a interface repaginada ao Linux", logo abaixo desta tabela | Baixo a médio |
 | **Servidor aceita rajadas de pedidos** (0.6.0-win) | `request_queue_size = 128` na classe `Server` do `sm/server.py`; com o padrão (5), o Windows recusava conexões ao carregar a página | A mesma linha no `sm/server.py`. No Linux o sintoma é mais raro, mas a linha é inofensiva | Baixo |
 | **Aba Atualização e aviso de versão nova** (0.7.0-win) | `sm/selfupdate.py` compara `__version__` com o `sm/__init__.py` do GitHub e traz o `CHANGELOG.md`; rotas `GET /api/panel-update` e `POST /api/panel-update/check`; `[update]` no config; `web/js/modules/update.js` marca "Nova" na navegação | Ver "Levar a aba Atualização ao Linux", abaixo desta tabela | Baixo |
+| **Mural** (0.8.0-win) | `sm/mural.py` (preferências em `data/mural.json`, clima Open-Meteo, arte), `web/js/mural-stage.js`, `web/js/modules/mural.js`, `web/css/mural.css`; `game_key` e `steam_games` em `sm/game.py` | Ver "Levar o Mural e o webhook ao Linux", abaixo desta tabela | Médio |
+| **Notificações por webhook** (0.8.0-win) | `sm/webhook.py` (token com hash, limites), `Alerts.external`, rotas `/api/webhook/*`, `/api/webhook/notify` em `PUBLIC`, cartão em `alerts.js` | Portável sem mudança de lógica; ver a mesma seção | Baixo |
 | Nome real do monitor e tipo de conexão (ex.: "LG ULTRAGEAR · DisplayPort") e chip "principal" | DisplayConfig (Win32) | Ler o EDID em `/sys/class/drm/card*-*/edid` (nome no descritor 0xFC); o `kscreen-doctor -j` já informa a saída primária | Baixo |
 | Escala da tela em % no cartão do monitor | `GetDpiForMonitor` | O `kscreen-doctor -j` já devolve `scale`; só formatar como % no frontend | Baixo |
 | Uso da GPU por tipo de engine (3D, cópia, vídeo) | Contadores "GPU Engine" | O fdinfo do DRM já separa engines (`gfx`, `compute`, `dec`, `enc`); expor em `gpu.engines` | Baixo |
@@ -29,6 +31,19 @@ Situação em: versão Linux 0.4.6, versão Windows 0.7.0-win.
 | Atualizações que pedem reinício | Campo `RebootRequired` do Windows Update | Comparar `uname -r` com o kernel instalado em `/usr/lib/modules`; `needs-restarting` no Fedora; `/var/run/reboot-required` no Debian/Ubuntu | Baixo |
 | Aviso de rede "Pública" bloqueando o acesso pelo celular | `Get-NetConnectionProfile` no instalador | O `install.sh` já libera a porta no `ufw`/`firewalld`; falta avisar quando há outro firewall (`nftables`/`iptables` com política DROP) | Baixo |
 | Captura de tela sem programa externo | GDI (BitBlt) + encoder PNG próprio | No Wayland só pelo portal (`org.freedesktop.portal.Screenshot`) ou Spectacle; manter o Spectacle | — (não vale) |
+
+### Levar o Mural e o webhook ao Linux
+
+Faça depois da interface repaginada: usam `icons.js` e os tokens de cor.
+
+1. **Webhook:** copie `sm/webhook.py` e `tests/test_webhook.py`. Em `sm/alerts.py`, traga `external()` e a mudança em `_deliver`. Em `sm/server.py`, acrescente `/api/webhook/notify` a `PUBLIC` e à lista liberada antes do cadastro da senha. Em `server.py`, `ctx.webhook = Webhook(ctx.alerts)` depois dos alertas. Traga as rotas, o cartão de `alerts.js` e os descritores de `sm/audit.py`. Nada depende do sistema.
+2. **Mural, sem mudança:** copie `web/js/mural-stage.js`, `web/js/modules/mural.js`, `web/css/mural.css` e `tests/test_mural.py`, registre em `modules/index.js` e inclua `mural.css` no `index.html`. Traga os ícones novos de `icons.js`. O `sm/mural.py` só depende de `STEAM_ROOTS`, `_write_private` e `steam_games`.
+3. **`sm/game.py` do Linux:** `running_game()` já devolve `appid` e o jogo sem Steam vem do MangoHud. Falta só portar `game_key()`, devolver `key` em `status()` (o `"exe"` no jogo do MangoHud é opcional: sem ele, a chave usa o nome) e trazer `steam_games()`, que é igual.
+4. **Caminhos da Steam:** `STEAM_ROOTS` já existe em `sm/desktop.py` do Linux, com as pastas nativa e Flatpak. O cache `appcache/librarycache/<appid>` deve ter o mesmo formato: confira numa instalação real.
+5. **FPS no Mural:** vem de `d.game.fps`, então funciona com o MangoHud sem mudança. No Linux, `cpu_load` e `gpu_load` por jogo existem: dá para usar no lugar do uso total.
+6. **Não muda:** clima e mídia (o frontend usa `d.media`, igual ao MPRIS atual).
+
+Limitações nas duas versões: impedir a tela de apagar exige HTTPS ou localhost, e o iPhone não oferece tela cheia para páginas.
 
 ### Levar a aba Atualização ao Linux
 
