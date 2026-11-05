@@ -10,7 +10,7 @@ backend de cada sistema.
 **Regra:** ao implementar algo novo em uma versão, registre aqui se dá para levar para a outra (e como), ou se é
 impossível (e por quê). Quando for portado, mova a linha para "Já equalizado" e anote a versão.
 
-Situação em: versão Linux 0.4.6, versão Windows 0.9.0-win.
+Situação em: versão Linux 0.4.6, versão Windows 0.11.1-win.
 
 ## 1. Só no Windows: dá para levar ao Linux
 
@@ -21,6 +21,8 @@ Situação em: versão Linux 0.4.6, versão Windows 0.9.0-win.
 | **Aba Atualização e aviso de versão nova** (0.7.0-win) | `sm/selfupdate.py` compara `__version__` com o `sm/__init__.py` do GitHub e traz o `CHANGELOG.md`; rotas `GET /api/panel-update` e `POST /api/panel-update/check`; `[update]` no config; `web/js/modules/update.js` marca "Nova" na navegação | Ver "Levar a aba Atualização ao Linux", abaixo desta tabela | Baixo |
 | **Mural** (0.8.0-win; cores vivas e motor de eventos na 0.9.0-win) | `sm/mural.py` (preferências em `data/mural.json`, clima Open-Meteo, arte), `web/js/mural-stage.js`, `mural-palette.js`, `mural-events.js`, `web/js/modules/mural.js`, `web/css/mural.css`; `game_key` e `steam_games` em `sm/game.py` | Ver "Levar o Mural e o webhook ao Linux", abaixo desta tabela | Médio |
 | **Notificações por webhook** (0.8.0-win) | `sm/webhook.py` (token com hash, limites), `Alerts.external`, rotas `/api/webhook/*`, `/api/webhook/notify` em `PUBLIC`, cartão em `alerts.js` | Portável sem mudança de lógica; ver a mesma seção | Baixo |
+| **Cores e estilos do painel** (0.10.0-win; estilos na 0.11.0-win) | Blocos `[data-palette]` em `web/css/app.css`, `web/css/styles.css`, `web/js/theme.js` (janela Aparência) e `web/js/theme-boot.js` (aplica antes de a página aparecer). Só frontend | Copiar junto com a interface repaginada. O estilo Vidro exige `mural-backdrop.js`. Sem mudança de lógica | Baixo |
+| **Apps que não são jogos** (0.9.1-win) | Lista em `data/game.json` (`not_games`), `set_not_game` e `recent_games` em `sm/game.py`, rota `POST /api/game/not-game`, cartão em `web/js/modules/mural.js`. Vale para jogo por `.exe` e da Steam | Levar junto com o Mural. O MangoHud só mede o que foi lançado com ele, então falsos positivos são raros: basta filtrar por `game_key` em `status()`. A chave de jogo sem Steam precisa do `exe` no jogo do MangoHud | Baixo |
 | Nome real do monitor e tipo de conexão (ex.: "LG ULTRAGEAR · DisplayPort") e chip "principal" | DisplayConfig (Win32) | Ler o EDID em `/sys/class/drm/card*-*/edid` (nome no descritor 0xFC); o `kscreen-doctor -j` já informa a saída primária | Baixo |
 | Escala da tela em % no cartão do monitor | `GetDpiForMonitor` | O `kscreen-doctor -j` já devolve `scale`; só formatar como % no frontend | Baixo |
 | Uso da GPU por tipo de engine (3D, cópia, vídeo) | Contadores "GPU Engine" | O fdinfo do DRM já separa engines (`gfx`, `compute`, `dec`, `enc`); expor em `gpu.engines` | Baixo |
@@ -32,17 +34,53 @@ Situação em: versão Linux 0.4.6, versão Windows 0.9.0-win.
 | Aviso de rede "Pública" bloqueando o acesso pelo celular | `Get-NetConnectionProfile` no instalador | O `install.sh` já libera a porta no `ufw`/`firewalld`; falta avisar quando há outro firewall (`nftables`/`iptables` com política DROP) | Baixo |
 | Captura de tela sem programa externo | GDI (BitBlt) + encoder PNG próprio | No Wayland só pelo portal (`org.freedesktop.portal.Screenshot`) ou Spectacle; manter o Spectacle | — (não vale) |
 
+### Ordem para levar tudo ao Linux
+
+Tudo depende da aprovação da interface repaginada. Cada etapa precisa da anterior, e o melhor é fazer uma versão do Linux por
+etapa, rodando os testes e movendo a linha para "Já equalizado" ao terminar.
+
+| Etapa | O que leva | Versões do Windows | Commits | Guia |
+|---|---|---|---|---|
+| 1 | Interface repaginada | 0.6.0-win | `54e84ac` | "Levar a interface repaginada ao Linux" |
+| 2 | Cores e estilos | 0.10.0-win, 0.11.0-win | `2640c7a`, `c1514bc` | "Levar as cores e os estilos ao Linux" |
+| 3 | Aba Atualização | 0.7.0-win | `c75d03f` | "Levar a aba Atualização ao Linux" |
+| 4 | Webhook | 0.8.0-win | `0a9c3c5` | "Levar o Mural e o webhook ao Linux", passo 1 |
+| 5 | Mural, com cores vivas, eventos, fundos e dock | 0.8.0-win a 0.10.0-win | `0a9c3c5`, `df34854`, `2640c7a` | "Levar o Mural e o webhook ao Linux", demais passos |
+| 6 | Apps que não são jogos | 0.9.1-win | `2140a7a` | "Levar o Mural e o webhook ao Linux", passo 9 |
+
+Não vão ao Linux: `atualizar.cmd` (lá já existe o `atualizar.sh`), `Enable-LhmWebServer` (seção 3) e `tabby.exe` em `NOT_GAMES`.
+
+### Levar as cores e os estilos ao Linux
+
+Só frontend. Faça logo depois da interface repaginada.
+
+1. Copie `web/css/styles.css`, `web/js/theme.js`, `web/js/theme-boot.js`, `web/js/mural-backdrop.js` e `web/js/mural-palette.js`. Os dois últimos são necessários mesmo antes do Mural: `theme.js` desenha o fundo do estilo Vidro com eles.
+2. Os blocos `[data-palette]` já vêm no `web/css/app.css` copiado inteiro na etapa da interface. Se ele foi copiado da 0.6.0-win, copie de novo do Windows atual.
+3. Em `web/index.html`: `<link rel="stylesheet" href="/css/styles.css">` antes de `mural.css`, `<script src="/js/theme-boot.js"></script>` logo depois dos estilos, e título e `aria-label` do `#theme-btn` como "Aparência". É preciso existir `<meta name="theme-color">`.
+4. Em `web/js/app.js`: importe `setupAppearance` de `theme.js` e, em `setupTheme()`, troque a leitura do `localStorage` e o clique que alterna o tema por `setupAppearance(app)`.
+5. O servidor não muda: os arquivos novos só carregam depois do login, então não entram em `PUBLIC`. As telas de login e cadastro continuam com as cores padrão.
+6. Só no Linux: confira a aba Ventoinha nos estilos Vidro e Osciloscópio. `styles.css` não tem regra para `.fan-*`, porque essa aba não existe no Windows.
+7. Confira no PC e no celular, nos dois temas.
+
+Cuidados que custaram retrabalho no Windows:
+
+- Não use `light-dark()` nos tokens: nos testes o tema escuro não aplicava. Cada cor tem regras explícitas para escuro, `[data-theme="light"]` e `prefers-color-scheme`.
+- Não ponha `backdrop-filter` em `.topbar` no celular: a barra `.tabs` fica dentro dela e é fixa, e o desfoque a prende ao cabeçalho.
+- `--bg` e `--accent` precisam continuar em hexadecimal: `theme.js` e `mural-backdrop.js` fazem contas com esses valores.
+
 ### Levar o Mural e o webhook ao Linux
 
 Faça depois da interface repaginada: usam `icons.js` e os tokens de cor.
 
 1. **Webhook:** copie `sm/webhook.py` e `tests/test_webhook.py`. Em `sm/alerts.py`, traga `external()` e a mudança em `_deliver`. Em `sm/server.py`, acrescente `/api/webhook/notify` a `PUBLIC` e à lista liberada antes do cadastro da senha. Em `server.py`, `ctx.webhook = Webhook(ctx.alerts)` depois dos alertas. Traga as rotas, o cartão de `alerts.js` e os descritores de `sm/audit.py`. Nada depende do sistema.
 2. **Mural, sem mudança:** copie `web/js/mural-stage.js`, `web/js/modules/mural.js`, `web/css/mural.css` e `tests/test_mural.py`, registre em `modules/index.js` e inclua `mural.css` no `index.html`. Traga os ícones novos de `icons.js`. O `sm/mural.py` só depende de `STEAM_ROOTS`, `_write_private` e `steam_games`.
-3. **`sm/game.py` do Linux:** `running_game()` já devolve `appid` e o jogo sem Steam vem do MangoHud. Falta só portar `game_key()`, devolver `key` em `status()` (o `"exe"` no jogo do MangoHud é opcional: sem ele, a chave usa o nome) e trazer `steam_games()`, que é igual.
+3. **`sm/game.py` do Linux:** traga `RX_KEY` e `valid_key()`, que desde a 0.9.1-win ficam em `sm/game.py` (`sm/mural.py` importa `valid_key` de lá; sem isso o Mural nem inicia). `running_game()` já devolve `appid` e o jogo sem Steam vem do MangoHud. Falta só portar `game_key()`, devolver `key` em `status()` (o `"exe"` no jogo do MangoHud é opcional: sem ele, a chave usa o nome) e trazer `steam_games()`, que é igual.
 4. **Caminhos da Steam:** `STEAM_ROOTS` já existe em `sm/desktop.py` do Linux, com as pastas nativa e Flatpak. O cache `appcache/librarycache/<appid>` deve ter o mesmo formato: confira numa instalação real.
 5. **FPS no Mural:** vem de `d.game.fps`, então funciona com o MangoHud sem mudança. No Linux, `cpu_load` e `gpu_load` por jogo existem: dá para usar no lugar do uso total.
 6. **Não muda:** clima e mídia (o frontend usa `d.media`, igual ao MPRIS atual).
-7. **Cores e eventos (0.9.0-win):** `web/js/mural-palette.js` e `web/js/mural-events.js` são só frontend e entram sem mudança, assim como `display` em `sm/webhook.py` e `Alerts.external`. `sunrise` e `sunset` estão em `sm/mural.py`.
+7. **Fundos do Início e dock (0.10.0-win):** `web/js/mural-backdrop.js` e os trechos em `mural-stage.js` são só frontend. No backend, `BACKGROUNDS`, `set_background`, `reset_background` e `background` em `sm/mural.py`, as rotas `/api/mural/background` e os dois textos em `sm/audit.py`. Exige `theme.js`, por causa do fundo Placa de circuito.
+8. **Cores e eventos (0.9.0-win):** `web/js/mural-palette.js` e `web/js/mural-events.js` são só frontend e entram sem mudança, assim como `display` em `sm/webhook.py` e `Alerts.external`. `sunrise` e `sunset` estão em `sm/mural.py`.
+9. **Apps que não são jogos (0.9.1-win):** em `sm/game.py` do Linux, traga `not_games`, `recent`, `set_not_game()` e a gravação em `data/game.json` junto com `fps_enabled`. O `status()` do Linux é diferente: aplique só a regra, removendo o jogo atual quando `game_key(game)` estiver na lista e devolvendo `not_games` e `recent_games`. Para o jogo do MangoHud ter chave estável, inclua `"exe"` nele. Traga a rota `POST /api/game/not-game`, o texto `game_not_game` em `sm/audit.py`, o cartão em `web/js/modules/mural.js`, as classes `.not-game*` de `mural.css` e os testes de `tests/test_features.py` que couberem.
 
 Limitações nas duas versões: impedir a tela de apagar exige HTTPS ou localhost, e o iPhone não oferece tela cheia para páginas.
 
@@ -86,7 +124,6 @@ Para voltar atrás no Linux: `git restore --source=ui-classica-0.4.6 -- web`, se
 
 | Recurso | Como é no Linux | Como fazer no Windows | Esforço |
 |---|---|---|---|
-| **Script de atualização** `atualizar.sh` (0.4.6) | `git fetch`, lista os commits novos, `git pull --ff-only` e reinstala no mesmo modo (root/usuário); `--verificar`, `--forcar`; a cópia instalada acha o clone por `.origem` | `atualizar.ps1`: mesmo fluxo com `git -C`, ler a versão de `sm\__init__.py` no `origin/main`, chamar `install.ps1` elevado e mostrar "Atualizado: X → Y". O `ATUALIZAR.md` do Windows passa a citar o script | Baixo |
 | **Instalador não instala na conta errada** (0.4.4) | Rodado de um terminal já como root sem `--root`, usa o dono da sessão gráfica; opção `--user NOME` | No `install.ps1`: comparar a conta que vai rodar a tarefa agendada com o dono da sessão do console (`(Get-CimInstance Win32_ComputerSystem).UserName`). Se o instalador foi elevado com **outra** conta de administrador, a tarefa no logon ficaria na conta errada: avisar e oferecer `-User NOME` | Baixo |
 | **Aviso de sessão aberta em outra conta** (Sistema > Sessão, 0.4.4) | `GET /api/session` devolve `service_user` e `other_users`; o cartão explica como reinstalar | Listar sessões com `WTSEnumerateSessions` (ou `quser`) e devolver os mesmos campos; o frontend já está pronto | Baixo |
 | **Script de diagnóstico** (0.4.4) | `tools/diagnostico.sh`: serviço, sessões, ambiente gráfico, áudio, tela, placa-mãe, sensores; não muda nada | `tools/diagnostico.ps1`: tarefa agendada (usuário, elevada?, última execução), sessão do console, LibreHardwareMonitor rodando, PresentMon, dispositivos Core Audio, monitores, versão | Baixo |
@@ -105,6 +142,7 @@ Para voltar atrás no Linux: `git restore --source=ui-classica-0.4.6 -- web`, se
 | Serviço como root com os comandos da sessão rodando como o dono da área de trabalho (`setpriv`, 0.4.4) | Linux | Não se aplica: no Windows a tarefa já roda elevada **na conta do usuário**, então áudio, tela e notificações já são os da sessão dele. O equivalente útil é a checagem de conta errada (seção 2). |
 | FPS sem configurar o jogo | Windows (PresentMon lê os eventos de apresentação do sistema) | O Linux não tem um ponto central equivalente; quem mede é a camada do jogo (MangoHud, gamescope). O mais próximo: detectar se o jogo roda no gamescope e ler as estatísticas dele. |
 | Temperatura da CPU sem programa extra | Linux (hwmon) | O Windows exige driver em modo kernel para ler os sensores; o LibreHardwareMonitor é esse driver. |
+| Ligar o servidor web do programa de sensores no instalador (0.11.1-win) | Windows (`Enable-LhmWebServer` em `install.ps1`) | O Linux lê hwmon direto, sem programa intermediário. |
 | Assinatura digital do executável | Windows (Authenticode) | Executáveis do Linux não são assinados. O equivalente é "qual pacote instalou" (já existe) e verificar se o arquivo foi alterado depois de instalado: `pacman -Qkk <pacote>` / `rpm -V` / `debsums`. **Isso dá para levar ao Linux** como sinal "binário alterado em relação ao pacote". |
 | Bytes por conexão desde o início | Linux (`ss` mostra o total da conexão) | O Windows só conta depois que alguém liga a coleta naquela conexão; o painel liga ao ver a conexão, então conexões antigas começam do zero. |
 | Detalhes do processo de outros usuários sem root | — | Nos dois sistemas exige privilégio (root / administrador). |
@@ -135,4 +173,5 @@ Portados depois (mesma API e mesma tela nas duas versões):
 | Quem está acessando (sessões, IP, origem, nome, MAC, encerrar, histórico de acessos) | Windows → Linux | 0.5.2-win → 0.4.5 | Só `arp_table()` muda: `GetIpNetTable` no Windows, `/proc/net/arp` no Linux |
 | Notificação no PC a cada login e a cada bloqueio por senha errada | Windows → Linux | 0.5.2-win → 0.4.5 | `notify_pc` de cada sistema |
 | Registro de ações feitas pelo painel | Windows → Linux | 0.5.3-win → 0.4.5 | No Linux há também a categoria "Ventoinha" (`fan_update`) e "Desbloquear a tela" é real |
-| Guia de atualização (`ATUALIZAR.md`) | Windows → Linux | 0.5.3-win → 0.4.6 | No Linux vem junto o `atualizar.sh` (ver seção 2) |
+| Guia de atualização (`ATUALIZAR.md`) | Windows → Linux | 0.5.3-win → 0.4.6 | No Linux vem junto o `atualizar.sh` |
+| Script de atualização | Linux → Windows | 0.4.6 → 0.9.2-win | `atualizar.sh` no Linux; `atualizar.cmd` e `atualizar.ps1` no Windows, com `-Verificar` e `-Forcar`. No Windows roda do clone (não há `.origem`), e a cópia instalada não é usada. O Windows confere a versão instalada depois, porque o instalador elevado roda em outra janela |
