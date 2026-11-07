@@ -48,9 +48,12 @@ def kill(req, pid):
         return Response({"error": "Finalizar processos está desativado na configuração."}, 403)
     body = req.json() or {}
     try:
-        return signal_process(int(pid), str(body.get("signal", "TERM")), body.get("create_time"))
+        focus = getattr(req.ctx, "focus", None)
+        return signal_process(int(pid), str(body.get("signal", "TERM")), body.get("create_time"),
+                              confirm_critical=bool(body.get("confirm_critical")),
+                              close_windows=focus.close_windows if focus else None)
     except ActionError as e:
-        return Response({"error": str(e)}, e.status)
+        return Response({"error": str(e), **e.extra}, e.status)
     except ValueError:
         return Response({"error": "PID inválido"}, 400)
 

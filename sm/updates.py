@@ -3,16 +3,19 @@
 Arch: checkupdates (pacman-contrib; usa uma cópia temporária do banco, sem root) + AUR (paru/yay -Qua).
 Debian/Ubuntu: apt list --upgradable (depende do último `apt update` feito pelo sistema).
 Fedora: dnf check-update. Todos: flatpak remote-ls --updates.
+Também informa se o PC precisa reiniciar (kernel novo instalado e o antigo ainda rodando).
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
 import threading
 import time
+from pathlib import Path
 
 from .config import ROOT
 
@@ -88,10 +91,53 @@ def sensitive(name: str) -> str | None:
     return None
 
 
+MODULES = Path("/usr/lib/modules")
+REBOOT_FLAGS = ("/var/run/reboot-required", "/run/reboot-required")     # Debian/Ubuntu
+
+
+def _mtime(p: Path) -> float:
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def reboot_required(release: str | None = None, modules: Path = MODULES) -> dict | None:
+    """O PC precisa reiniciar para usar o que foi atualizado? None = não; senão {"reason", "running", "installed"}.
+
+    - Arch/CachyOS: o pacote do kernel apaga /usr/lib/modules/<versão antiga>; se a pasta do kernel que está
+      rodando sumiu, ou há outra versão do mesmo pacote (pkgbase) instalada, o kernel novo só vale após reiniciar.
+    - Debian/Ubuntu: /var/run/reboot-required. Fedora: `needs-restarting -r` (sai com 1).
+    """
+    release = release or os.uname().release
+    running = modules / release
+    if modules.is_dir():
+        if not running.is_dir():
+            newer = sorted(d.name for d in modules.iterdir() if (d / "vmlinuz").exists())
+            return {"reason": "kernel", "running": release, "installed": ", ".join(newer) or None}
+        base = (running / "pkgbase").read_text().strip() if (running / "pkgbase").exists() else None
+        if base:
+            mine = _mtime(running / "vmlinuz")
+            for d in modules.iterdir():
+                # outra versão do mesmo pacote, instalada depois (cópias antigas guardadas por hooks são mais velhas)
+                if d != running and (d / "pkgbase").exists() and (d / "pkgbase").read_text().strip() == base \
+                        and _mtime(d / "vmlinuz") > mine:
+                    return {"reason": "kernel", "running": release, "installed": d.name}
+    for f in REBOOT_FLAGS:
+        if os.path.exists(f):
+            return {"reason": "sistema", "running": release, "installed": None}
+    if shutil.which("needs-restarting"):
+        rc, _ = _run(["needs-restarting", "-r"], timeout=30)
+        if rc == 1:
+            return {"reason": "sistema", "running": release, "installed": None}
+    return None
+
+
 class Updates:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.running = False
+        self._reboot: tuple[float, dict | None] = (0.0, None)
         try:
             self.data = json.loads(CACHE.read_text())
         except (OSError, ValueError):
@@ -99,8 +145,15 @@ class Updates:
         threading.Thread(target=self._loop, daemon=True, name="updates").start()
 
     def status(self) -> dict:
+        now = time.time()
+        if now - self._reboot[0] > 60:      # barato, mas não precisa a cada pedido
+            try:
+                self._reboot = (now, reboot_required())
+            except OSError:
+                self._reboot = (now, None)
         with self.lock:
-            return {"running": self.running, **(self.data or {"items": [], "count": None, "checked": None})}
+            return {"running": self.running, **(self.data or {"items": [], "count": None, "checked": None}),
+                    "reboot": self._reboot[1]}
 
     def refresh(self) -> None:
         with self.lock:

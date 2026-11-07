@@ -5,6 +5,7 @@ import os
 import psutil
 
 from . import Collector, register
+from ..actions import CRITICAL
 
 ATTRS = ["pid", "ppid", "name", "username", "cpu_percent", "memory_info", "memory_percent",
          "status", "cmdline", "create_time", "num_threads"]
@@ -45,6 +46,7 @@ class Processes(Collector):
                 "create_time": i.get("create_time"),
                 "gpu": g.get("gpu"), "gpu_mem": g.get("gpu_mem"),
                 "kernel": kernel, "self": i["pid"] == self.self_pid,
+                "critical": (i.get("name") or "") in CRITICAL or i["pid"] == 1,
             })
         self.ctx.processes = procs
         if self.ctx.proctrack:

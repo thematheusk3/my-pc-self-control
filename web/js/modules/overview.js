@@ -117,6 +117,22 @@ function mount(el, a) {
   app.onSnapshot(update);
 }
 
+// nomes das engines da GPU: Linux (fdinfo do DRM: amdgpu, i915/xe; NVML) e Windows (contadores "GPU Engine")
+const ENGINE = { gfx: "3D", render: "3D", "3D": "3D", compute: "Compute", Compute: "Compute", copy: "Cópia", Copy: "Cópia",
+  dma: "Cópia", sdma: "Cópia", dec: "Vídeo decod.", VideoDecode: "Vídeo decod.", enc: "Vídeo cod.", VideoEncode: "Vídeo cod.",
+  video: "Vídeo", "video-enhance": "Vídeo (pós)", VideoProcessing: "Vídeo (pós)", jpeg: "JPEG" };
+
+function enginesText(e) {
+  const by = {};
+  for (const [k, v] of Object.entries(e || {})) {
+    const base = k.replace(/_\d+$/, "");
+    const name = ENGINE[base] || base;
+    by[name] = Math.max(by[name] || 0, v);
+  }
+  const top = Object.entries(by).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  return top.length ? top.map(([k, v]) => `${esc(k)} ${Math.round(v)}%`).join(" · ") : "";
+}
+
 function stat(label, value) {
   return `<div><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
 }
@@ -164,6 +180,8 @@ function update(snap) {
     if (g.power != null) st += stat("Potência", `${g.power.toFixed(1)} W`);
     if (g.fan != null) st += stat("Fan", `${Math.round(g.fan)} RPM`);
     if (g.fan_pct != null) st += stat("Fan", pct(g.fan_pct));
+    const eng = enginesText(g.engines);
+    if (eng) st += stat("Por engine", eng);
     $("[data-stats]", el).innerHTML = st;
     $("[data-note]", el).textContent = [...(g.notes || []), g.busy_source === "fdinfo" ? "Uso estimado pelos processos visíveis." : ""].filter(Boolean).join(" ");
   });

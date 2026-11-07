@@ -103,6 +103,32 @@ class PackageDB:
             self.cache[key] = info
         return info
 
+    def expected_digest(self, pkg: str, path: str) -> tuple[str, str] | None:
+        """(algoritmo, hash) do arquivo como o pacote o instalou, lido do banco do gerenciador de pacotes
+        (pacman: mtree; dpkg: md5sums; rpm: --dump). None = o pacote não registra esse arquivo."""
+        real = os.path.realpath(path)
+        key = f"dig:{pkg}:{real}"
+        with self.lock:
+            if key in self.cache:
+                return self.cache[key]
+        found = None
+        try:
+            if self.tool == "pacman":
+                found = _pacman_digest(pkg, real)
+            elif self.tool == "dpkg-query":
+                found = _dpkg_digest(pkg, real)
+            elif self.tool == "rpm":
+                for line in self._run(["rpm", "-q", "--dump", pkg]).splitlines():
+                    f = line.split(" ")
+                    if len(f) > 3 and f[0] in (real, path) and len(f[3]) in (32, 64):
+                        found = ("md5" if len(f[3]) == 32 else "sha256", f[3])
+                        break
+        except (OSError, ValueError):
+            found = None
+        with self.lock:
+            self.cache[key] = found
+        return found
+
     def _run(self, args: list[str]) -> str:
         try:
             return subprocess.run(args, capture_output=True, text=True, timeout=20,
@@ -136,6 +162,68 @@ class PackageDB:
             for real, pkg in self._lookup(list(alt)).items():
                 out[alt[real]] = pkg
         return out
+
+
+def _mtree_unescape(p: str) -> str:
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), p)
+
+
+def _pacman_digest(pkg: str, real: str) -> tuple[str, str] | None:
+    import gzip
+    for d in Path("/var/lib/pacman/local").glob(f"{glob_escape(pkg)}-*"):
+        desc = (d / "desc").read_text(errors="replace").split("\n")
+        if len(desc) < 2 or desc[0] != "%NAME%" or desc[1] != pkg:
+            continue
+        with gzip.open(d / "mtree", "rt", errors="replace") as f:
+            for line in f:
+                parts = line.split()
+                if parts and _mtree_unescape(parts[0])[1:] == real:
+                    for kv in parts[1:]:
+                        if kv.startswith("sha256digest="):
+                            return "sha256", kv.split("=", 1)[1]
+                        if kv.startswith("md5digest="):
+                            return "md5", kv.split("=", 1)[1]
+        return None
+    return None
+
+
+def _dpkg_digest(pkg: str, real: str) -> tuple[str, str] | None:
+    rel = real.lstrip("/")
+    for f in Path("/var/lib/dpkg/info").glob(f"{glob_escape(pkg)}*.md5sums"):
+        if f.name.split(".md5sums")[0].split(":")[0] != pkg:
+            continue
+        for line in f.read_text(errors="replace").splitlines():
+            digest, _, fpath = line.partition("  ")
+            if fpath in (rel, rel.removeprefix("usr/")):
+                return "md5", digest
+    return None
+
+
+def glob_escape(s: str) -> str:
+    return re.sub(r"([*?\[])", r"[\1]", s)
+
+
+def verify_package_file(pkg: str | None, path: str, sha256: str | None) -> str | None:
+    """"ok" se o arquivo é igual ao que o pacote instalou, "changed" se foi alterado depois, None se não deu
+    para conferir. É o equivalente Linux a conferir a assinatura digital do executável no Windows."""
+    if not pkg or not PKG.tool:
+        return None
+    exp = PKG.expected_digest(pkg, path)
+    if not exp:
+        return None
+    algo, digest = exp
+    if algo == "sha256":
+        if not sha256:
+            return None
+        return "ok" if sha256 == digest.lower() else "changed"
+    h = hashlib.md5(usedforsecurity=False)
+    try:
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+    except OSError:
+        return None
+    return "ok" if h.hexdigest() == digest.lower() else "changed"
 
 
 PKG = PackageDB()
@@ -275,6 +363,10 @@ def flags_for(rec: dict, pkg: str | None, extra: dict | None = None) -> list[dic
         if rx.search(cmd):
             add(lvl, txt)
 
+    if extra.get("package_check") == "changed":
+        add("alto", f"O executável é diferente do que o pacote {pkg} instalou: foi alterado depois da instalação "
+                    "(substituído à mão, corrompido ou adulterado). Reinstale o pacote para restaurar o original")
+
     # dados ao vivo
     preload = extra.get("ld_preload")
     if preload:
@@ -402,11 +494,15 @@ def _finish(rec: dict, info: dict, hash_target: str | None) -> dict:
         if not sha and rec.get("sha256"):     # capturado quando o processo apareceu
             file["sha256"], file["hash_error"] = rec["sha256"], None
             file["note"] = "hash calculado quando o processo rodava"
-    flags = flags_for(rec, pkg, info)
+    check = None
+    if pkg and file and file.get("exists") and not deleted:
+        check = verify_package_file(pkg, exe, file.get("sha256"))   # sem "(deleted)": /proc/PID/exe é o próprio arquivo
+    flags = flags_for(rec, pkg, {**info, "package_check": check})
     trusted = exe in load_trusted() if exe else False
     return {
         "process": rec, "info": info, "exe": exe, "exe_guessed": guessed, "deleted": deleted,
         "package": pkg, "package_info": PKG.describe(pkg), "package_tool": PKG.tool, "file": file,
+        "package_check": check,
         "flags": flags, "score": score(flags), "trusted": trusted,
         "visibility": "full" if os.geteuid() == 0 or rec.get("exe_verified") else "limited",
     }

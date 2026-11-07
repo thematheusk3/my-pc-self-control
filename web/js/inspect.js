@@ -66,6 +66,8 @@ function render(app, dlg, d, onChange) {
     <div class="stat-label" style="margin-top:12px">Detalhes</div>
     <dl class="kv insp-kv">
       ${row("Executável", d.exe ? `<span class="mono">${esc(d.exe)}</span>${d.deleted ? ` <span class="chip critical">apagado</span>` : ""}${d.exe_guessed ? ` <span class="muted">(deduzido)</span>` : ""}` : "")}
+      ${d.package_check ? row("Integridade", d.package_check === "ok" ? "✔ igual ao que o pacote instalou"
+        : `<span class="chip critical">alterado</span> diferente do que o pacote instalou (reinstale: <code>${esc(d.package_tool === "pacman" ? `sudo pacman -S ${d.package}` : d.package_tool === "rpm" ? `sudo dnf reinstall ${d.package}` : `sudo apt install --reinstall ${d.package}`)}</code>)`) : ""}
       ${pk?.url ? row("Site", `<a href="${esc(pk.url)}" target="_blank" rel="noopener noreferrer">${esc(pk.url)}</a>`) : ""}
       ${f?.sha256 ? row("SHA-256", `<span class="mono hash" title="${f.sha256}">${f.sha256}</span>${f.note ? `<span class="muted" style="font-size:12px">${esc(f.note)}</span>` : ""}`) : f?.exists && f.hash_error ? row("SHA-256", `<span class="muted">${esc(f.hash_error)}</span>`) : ""}
       ${f?.exists ? row("Arquivo", `${bytes(f.size)} · ${esc(f.owner)} · ${f.mode.replace("0o", "")} · modificado ${when(f.mtime)}`) : f && !f.exists ? row("Arquivo", `<span class="muted">não existe mais no disco</span>`) : ""}

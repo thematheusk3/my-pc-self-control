@@ -10,7 +10,7 @@ backend de cada sistema.
 **Regra:** ao implementar algo novo em uma versão, registre aqui se dá para levar para a outra (e como), ou se é
 impossível (e por quê). Quando for portado, mova a linha para "Já equalizado" e anote a versão.
 
-Situação em: versão Linux 0.4.6, versão Windows 0.11.1-win.
+Situação em: versão Linux 0.4.7, versão Windows 0.11.1-win.
 
 ## 1. Só no Windows: dá para levar ao Linux
 
@@ -23,15 +23,6 @@ Situação em: versão Linux 0.4.6, versão Windows 0.11.1-win.
 | **Notificações por webhook** (0.8.0-win) | `sm/webhook.py` (token com hash, limites), `Alerts.external`, rotas `/api/webhook/*`, `/api/webhook/notify` em `PUBLIC`, cartão em `alerts.js` | Portável sem mudança de lógica; ver a mesma seção | Baixo |
 | **Cores e estilos do painel** (0.10.0-win; estilos na 0.11.0-win) | Blocos `[data-palette]` em `web/css/app.css`, `web/css/styles.css`, `web/js/theme.js` (janela Aparência) e `web/js/theme-boot.js` (aplica antes de a página aparecer). Só frontend | Copiar junto com a interface repaginada. O estilo Vidro exige `mural-backdrop.js`. Sem mudança de lógica | Baixo |
 | **Apps que não são jogos** (0.9.1-win) | Lista em `data/game.json` (`not_games`), `set_not_game` e `recent_games` em `sm/game.py`, rota `POST /api/game/not-game`, cartão em `web/js/modules/mural.js`. Vale para jogo por `.exe` e da Steam | Levar junto com o Mural. O MangoHud só mede o que foi lançado com ele, então falsos positivos são raros: basta filtrar por `game_key` em `status()`. A chave de jogo sem Steam precisa do `exe` no jogo do MangoHud | Baixo |
-| Nome real do monitor e tipo de conexão (ex.: "LG ULTRAGEAR · DisplayPort") e chip "principal" | DisplayConfig (Win32) | Ler o EDID em `/sys/class/drm/card*-*/edid` (nome no descritor 0xFC); o `kscreen-doctor -j` já informa a saída primária | Baixo |
-| Escala da tela em % no cartão do monitor | `GetDpiForMonitor` | O `kscreen-doctor -j` já devolve `scale`; só formatar como % no frontend | Baixo |
-| Uso da GPU por tipo de engine (3D, cópia, vídeo) | Contadores "GPU Engine" | O fdinfo do DRM já separa engines (`gfx`, `compute`, `dec`, `enc`); expor em `gpu.engines` | Baixo |
-| NVIDIA sem subprocesso (mais leve que chamar `nvidia-smi` a cada segundo) | NVML via ctypes (`nvml.dll`) | O mesmo código com `libnvidia-ml.so.1` | Baixo |
-| Finalizar "educado" (como clicar no X; o app pode perguntar se quer salvar) antes do SIGTERM | `WM_CLOSE` nas janelas do processo | Script do KWin (`window.closeWindow()`) para janelas do PID; sem janela, SIGTERM | Médio |
-| Processos críticos protegidos (finalizá-los derruba o sistema) | Lista: csrss, lsass, winlogon, dwm... | Proteger `systemd`, `kwin_wayland`, `plasmashell`, `sddm`/`plasmalogin`, `pipewire`, `Xwayland`, `dbus-daemon`, com aviso em vez de bloqueio total | Baixo |
-| Detecção de PID reaproveitado no histórico de processos | Compara o horário de início | Já usa `pid-starttime` como id; falta só verificar PIDs conhecidos (raro no Linux, `pid_max` alto) | Baixo |
-| Atualizações que pedem reinício | Campo `RebootRequired` do Windows Update | Comparar `uname -r` com o kernel instalado em `/usr/lib/modules`; `needs-restarting` no Fedora; `/var/run/reboot-required` no Debian/Ubuntu | Baixo |
-| Aviso de rede "Pública" bloqueando o acesso pelo celular | `Get-NetConnectionProfile` no instalador | O `install.sh` já libera a porta no `ufw`/`firewalld`; falta avisar quando há outro firewall (`nftables`/`iptables` com política DROP) | Baixo |
 | Captura de tela sem programa externo | GDI (BitBlt) + encoder PNG próprio | No Wayland só pelo portal (`org.freedesktop.portal.Screenshot`) ou Spectacle; manter o Spectacle | — (não vale) |
 
 ### Ordem para levar tudo ao Linux
@@ -112,9 +103,13 @@ Vale fazer depois de aprovar a interface no Windows. Quase tudo é frontend, e o
    git apply --reject --whitespace=nowarn /tmp/ui.patch
    ```
 4. No `sm/server.py`, repita as três mudanças: constante `FONT`, somada a `PUBLIC` e à lista liberada antes do cadastro da senha (senão o login fica sem a fonte); cache longo para `.woff2` em `_static`; `request_queue_size = 128`.
-5. Só no Linux: em `fan.js`, troque o ícone por `icon: ic("fan")` (já incluído em `icons.js`). A aba Ventoinha entra no "Mais" do celular, e os estilos `.fan-*` já estão no CSS novo.
-6. A faixa de estado cita a temperatura da CPU quando existe. No Linux ela vem do hwmon, então "Sem leitura de temperatura" não deve aparecer.
-7. Confira nos dois temas, no PC e no celular, e mova esta linha para "Já equalizado".
+5. Só no Linux, desde a 0.4.7: o diff do Windows não traz o que a 0.4.7 acrescentou ao frontend; confira que sobreviveu
+   ao `git apply` e aos `.rej`: nome/conexão/escala do monitor em `controls.js` (já iguais ao Windows), "Por engine" em
+   `overview.js`, faixa de reinício pendente em `system.js`, linha "Integridade" em `inspect.js`, aviso de processo essencial e
+   `closed_windows` em `procsheet.js`, e `status`/`data` no erro de `app.api` em `app.js`.
+6. Só no Linux: em `fan.js`, troque o ícone por `icon: ic("fan")` (já incluído em `icons.js`). A aba Ventoinha entra no "Mais" do celular, e os estilos `.fan-*` já estão no CSS novo.
+7. A faixa de estado cita a temperatura da CPU quando existe. No Linux ela vem do hwmon, então "Sem leitura de temperatura" não deve aparecer.
+8. Confira nos dois temas, no PC e no celular, e mova esta linha para "Já equalizado".
 
 Não precisa portar: a correção dos ícones de apps em `sm/desktop.py` (`HBITMAP`) é específica do Windows.
 
@@ -124,6 +119,9 @@ Para voltar atrás no Linux: `git restore --source=ui-classica-0.4.6 -- web`, se
 
 | Recurso | Como é no Linux | Como fazer no Windows | Esforço |
 |---|---|---|---|
+| **Aviso "precisa reiniciar"** no cartão de atualizações (0.4.7) | `GET /api/updates` devolve `reboot: {reason, running, installed}` ou `null`; o `system.js` mostra uma faixa no topo do cartão | O Windows já sabe (`RebootRequired` do Windows Update); devolver `reboot` como objeto (`{"reason": "sistema"}`), somando as chaves `...\Component Based Servicing\RebootPending` e `...\WindowsUpdate\Auto Update\RebootRequired` do registro, e copiar o trecho do `system.js` (hoje o Windows só cita o reinício dentro do aviso de pacotes sensíveis) | Baixo |
+| **Uso da GPU por engine na Visão geral** (0.4.7) | `gpu.engines` (fdinfo/NVML) exibido como "Por engine: 3D 42% · Vídeo cod. 3%" | O backend do Windows **já devolve** `engines` (contadores "GPU Engine"); só copiar `ENGINE`/`enginesText` do `overview.js` (os nomes do Windows, `3D`, `Copy`, `VideoDecode`..., já estão no mapa) | Baixo |
+| **Frontend: erro da API com dados** (0.4.7) | `app.api` anexa `status` e `data` ao erro; o `procsheet.js` usa `e.data.critical` para pedir confirmação de processo essencial aberto de uma lista sem a marca | Não muda nada no Windows (lá processo crítico é bloqueado com 403, ver seção 3), mas mantém os arquivos parecidos | Baixo |
 | **Instalador não instala na conta errada** (0.4.4) | Rodado de um terminal já como root sem `--root`, usa o dono da sessão gráfica; opção `--user NOME` | No `install.ps1`: comparar a conta que vai rodar a tarefa agendada com o dono da sessão do console (`(Get-CimInstance Win32_ComputerSystem).UserName`). Se o instalador foi elevado com **outra** conta de administrador, a tarefa no logon ficaria na conta errada: avisar e oferecer `-User NOME` | Baixo |
 | **Aviso de sessão aberta em outra conta** (Sistema > Sessão, 0.4.4) | `GET /api/session` devolve `service_user` e `other_users`; o cartão explica como reinstalar | Listar sessões com `WTSEnumerateSessions` (ou `quser`) e devolver os mesmos campos; o frontend já está pronto | Baixo |
 | **Script de diagnóstico** (0.4.4) | `tools/diagnostico.sh`: serviço, sessões, ambiente gráfico, áudio, tela, placa-mãe, sensores; não muda nada | `tools/diagnostico.ps1`: tarefa agendada (usuário, elevada?, última execução), sessão do console, LibreHardwareMonitor rodando, PresentMon, dispositivos Core Audio, monitores, versão | Baixo |
@@ -143,7 +141,8 @@ Para voltar atrás no Linux: `git restore --source=ui-classica-0.4.6 -- web`, se
 | FPS sem configurar o jogo | Windows (PresentMon lê os eventos de apresentação do sistema) | O Linux não tem um ponto central equivalente; quem mede é a camada do jogo (MangoHud, gamescope). O mais próximo: detectar se o jogo roda no gamescope e ler as estatísticas dele. |
 | Temperatura da CPU sem programa extra | Linux (hwmon) | O Windows exige driver em modo kernel para ler os sensores; o LibreHardwareMonitor é esse driver. |
 | Ligar o servidor web do programa de sensores no instalador (0.11.1-win) | Windows (`Enable-LhmWebServer` em `install.ps1`) | O Linux lê hwmon direto, sem programa intermediário. |
-| Assinatura digital do executável | Windows (Authenticode) | Executáveis do Linux não são assinados. O equivalente é "qual pacote instalou" (já existe) e verificar se o arquivo foi alterado depois de instalado: `pacman -Qkk <pacote>` / `rpm -V` / `debsums`. **Isso dá para levar ao Linux** como sinal "binário alterado em relação ao pacote". |
+| Assinatura digital do executável | Windows (Authenticode) | Executáveis do Linux não são assinados. O equivalente é "qual pacote instalou" e se o arquivo ainda é o que o pacote instalou: **feito na 0.4.7** (ver "Já equalizado"). |
+| Processo crítico: bloqueio total × confirmação | Windows bloqueia (403); Linux pede confirmação (409 + `confirm_critical`) | No Windows matar `csrss`/`wininit`/`lsass` é tela azul na hora, sem uso legítimo. No Linux reiniciar o `plasmashell` ou o `pipewire` é um conserto comum, então o painel avisa o efeito e deixa seguir. |
 | Bytes por conexão desde o início | Linux (`ss` mostra o total da conexão) | O Windows só conta depois que alguém liga a coleta naquela conexão; o painel liga ao ver a conexão, então conexões antigas começam do zero. |
 | Detalhes do processo de outros usuários sem root | — | Nos dois sistemas exige privilégio (root / administrador). |
 
@@ -174,4 +173,13 @@ Portados depois (mesma API e mesma tela nas duas versões):
 | Notificação no PC a cada login e a cada bloqueio por senha errada | Windows → Linux | 0.5.2-win → 0.4.5 | `notify_pc` de cada sistema |
 | Registro de ações feitas pelo painel | Windows → Linux | 0.5.3-win → 0.4.5 | No Linux há também a categoria "Ventoinha" (`fan_update`) e "Desbloquear a tela" é real |
 | Guia de atualização (`ATUALIZAR.md`) | Windows → Linux | 0.5.3-win → 0.4.6 | No Linux vem junto o `atualizar.sh` |
+| Nome real do monitor, tipo de conexão, chip "principal" e escala em % | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: nome no EDID (`/sys/class/drm/card*-*/edid`, descritor 0xFC), tipo e principal do `kscreen-doctor -j` (`type`, `priority`) |
+| Uso da GPU por tipo de engine (`gpu.engines`) | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: fdinfo do DRM (`gfx`, `compute`, `dec`, `enc`...) e, na NVIDIA, NVML (3D + codificador/decodificador). Exibido só no Linux por enquanto (seção 2) |
+| NVIDIA pelo NVML (sem subprocesso) | Windows → Linux | 0.5.0-win → 0.4.7 | Mesmo código ctypes com `libnvidia-ml.so.1`; `nvidia-smi` continua como plano B nos dois |
+| Finalizar "educado" (fechar as janelas antes do SIGTERM) | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: script de uma vez só no KWin (`closeWindow()` nas janelas do PID, resposta pelo journal); X11 sem KDE com `wmctrl -ic`. Resposta `closed_windows` / `note` igual |
+| Processos críticos | Windows → Linux | 0.5.0-win → 0.4.7 | Linux avisa e pede confirmação em vez de bloquear (seção 3); campo `critical` na lista de processos |
+| PID reaproveitado no histórico de processos | Windows → Linux | 0.5.0-win → 0.4.7 | Linux compara o `starttime` do `/proc/<pid>/stat` com o id `pid-starttime` a cada ~1 s |
+| Atualizações que pedem reinício | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: kernel rodando × instalado em `/usr/lib/modules` (`pkgbase`), `/run/reboot-required`, `needs-restarting -r` |
+| Aviso de firewall bloqueando o celular | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: `install.sh` avisa quando `nftables`/`iptables` têm política DROP e a porta não está liberada (ufw/firewalld já eram liberados) |
+| Verificação do executável (assinatura digital × integridade do pacote) | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: SHA-256 do executável × banco do pacote (`pacman` mtree, `dpkg` md5sums, `rpm --dump`); alterado = sinal alto |
 | Script de atualização | Linux → Windows | 0.4.6 → 0.9.2-win | `atualizar.sh` no Linux; `atualizar.cmd` e `atualizar.ps1` no Windows, com `-Verificar` e `-Forcar`. No Windows roda do clone (não há `.origem`), e a cópia instalada não é usada. O Windows confere a versão instalada depois, porque o instalador elevado roda em outra janela |

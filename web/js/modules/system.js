@@ -245,11 +245,15 @@ function renderUpdates(st) {
   if (!card) return;
   card.querySelector("[data-upd-refresh]").disabled = st.running;
   const body = $("[data-upd-body]", card);
-  if (st.count == null) { body.innerHTML = st.running ? "Verificando…" : "Ainda não verificado."; return; }
+  const rb = st.reboot;
+  const rebootHtml = rb ? `<p class="fan-alert warning" style="margin:0 0 8px">↻ <b>O PC precisa reiniciar</b> para usar o que foi atualizado${
+    rb.reason === "kernel" ? `: está rodando o kernel <span class="mono">${esc(rb.running)}</span>${rb.installed ? `, mas o instalado é <span class="mono">${esc(rb.installed)}</span>` : ", que já foi removido do disco"}.
+      Até reiniciar, módulos novos (ex.: um pendrive ou driver carregado agora) podem não funcionar` : ""}.</p>` : "";
+  if (st.count == null) { body.innerHTML = rebootHtml + (st.running ? "Verificando…" : "Ainda não verificado."); return; }
   const by = {};
   for (const i of st.items) (by[i.source] ||= []).push(i);
   const sens = st.items.filter(i => i.sensitive);
-  body.innerHTML = `<p style="margin:0 0 8px">${st.count ? `<b>${st.count}</b> atualizações pendentes` : "Tudo atualizado ✔"}
+  body.innerHTML = `${rebootHtml}<p style="margin:0 0 8px">${st.count ? `<b>${st.count}</b> atualizações pendentes` : "Tudo atualizado ✔"}
       · verificado ${new Date(st.checked * 1000).toLocaleString("pt-BR")}${st.running ? " · verificando…" : ""}</p>
     ${sens.length ? `<p class="fan-alert warning" style="margin:0 0 8px">Inclui pacotes sensíveis (${esc(sens.map(i => i.name).join(", "))}).
       Atualize <b>sentado na frente do PC</b> e reinicie em seguida.</p>` : ""}

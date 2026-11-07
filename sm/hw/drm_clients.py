@@ -69,6 +69,7 @@ class DrmClientTracker:
         self._prev_t = 0.0
         self.per_pid: dict[int, dict] = {}      # pid -> {"gpu": %, "gpu_mem": bytes}
         self.per_device_busy: dict[str, float] = {}
+        self.per_device_engines: dict[str, dict[str, float]] = {}   # pdev -> {engine (gfx, compute, dec...): %}
 
     def update(self) -> None:
         now = time.monotonic()
@@ -96,4 +97,6 @@ class DrmClientTracker:
             per_pid[pid] = {"gpu": round(best, 1), "gpu_mem": mem}
         self.per_pid = per_pid
         self.per_device_busy = {dev: min(100.0, max(e.values())) for dev, e in dev_engine_totals.items() if e}
+        self.per_device_engines = {dev: {k: round(min(100.0, v), 1) for k, v in e.items()}
+                                   for dev, e in dev_engine_totals.items() if e}
         self._prev, self._prev_t = cur, now

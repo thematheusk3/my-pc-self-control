@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.7
+Trazido da versão Windows (tudo da seção 1 do [PARIDADE.md](PARIDADE.md) que se aplica ao Linux):
+- Controles > Tela: cada monitor aparece com o **nome real** (EDID, ex.: "LG ULTRAGEAR (DP-4)"), o **tipo de conexão**
+  (DisplayPort, HDMI, tela embutida), a **escala em %** e o chip **principal**.
+- Visão geral > GPU: **uso por engine** (3D, compute, vídeo, cópia), somando os processos (fdinfo do DRM) ou, na
+  NVIDIA, pelo driver.
+- NVIDIA lida pelo **NVML** (`libnvidia-ml.so.1`, via ctypes) em vez de abrir o `nvidia-smi` a cada segundo;
+  sem a biblioteca, continua usando o `nvidia-smi`. Inclui uso do codificador/decodificador de vídeo.
+- Processos > **Finalizar** agora fecha as janelas do processo como clicar no X (script de uma vez só no KWin; no X11
+  com `wmctrl`): o app pode perguntar se quer salvar. Sem janela, SIGTERM como antes. "Forçar" continua SIGKILL.
+- **Processos essenciais** (systemd, logind, D-Bus, KWin, Xwayland, plasmashell, PipeWire, WirePlumber, SDDM/plasmalogin,
+  NetworkManager...): aviso do que acontece se pararem e confirmação extra (`confirm_critical`); não é bloqueio total.
+- Histórico de processos: **PID reaproveitado** é detectado (horário de início diferente) e o processo antigo vai
+  para os encerrados em vez de ser confundido com o novo.
+- Sistema > Atualizações: aviso de que o **PC precisa reiniciar** (kernel novo instalado com o antigo rodando;
+  `/run/reboot-required` no Debian/Ubuntu; `needs-restarting -r` no Fedora). API: campo `reboot` em `GET /api/updates`.
+- Instalador: sem `ufw`/`firewalld`, avisa se um firewall `nftables`/`iptables` bloqueia a entrada e a porta do
+  painel não está liberada (o celular não conseguiria abrir), com o comando para liberar.
+- Processos > Analisar: confere se o executável **ainda é igual ao que o pacote instalou** (SHA-256 do banco do
+  `pacman`, `md5sums` do `dpkg` ou `rpm --dump`); se foi alterado, vira sinal **alto** com o comando para reinstalar.
+  É o equivalente Linux à verificação de assinatura digital do Windows.
+
 ## 0.4.6
 - `./atualizar.sh`: baixa a versão nova do GitHub, lista o que mudou e reinstala do mesmo jeito que o serviço já
   está (root ou seu usuário); `--verificar` só consulta, `--forcar` reinstala mesmo sem versão nova. Funciona também

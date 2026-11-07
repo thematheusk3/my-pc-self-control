@@ -19,13 +19,16 @@ O projeto é feito e testado no **[CachyOS](https://cachyos.org) com KDE Plasma 
 
 ## O que mostra
 
-- **Visão geral**: CPU (uso total, por thread, clock, temperatura, load), GPU (uso, temperatura,
-  VRAM/GTT, clocks, potência, fan), memória, rede, discos, e os maiores consumidores de CPU/RAM/GPU.
+- **Visão geral**: CPU (uso total, por thread, clock, temperatura, load), GPU (uso, uso por engine: 3D, vídeo,
+  cópia..., temperatura, VRAM/GTT, clocks, potência, fan; NVIDIA lida pelo NVML, sem subprocesso), memória, rede, discos, e os maiores consumidores de CPU/RAM/GPU.
 - **Processos**: lista completa com busca, filtro por usuário, ordenação, uso de GPU por processo
-  e opção de **finalizar** (SIGTERM) ou **forçar** (SIGKILL), com confirmação.
+  e opção de **finalizar** ou **forçar** (SIGKILL), com confirmação. Finalizar fecha as janelas do processo como
+  clicar no X (pelo KWin; no X11 com `wmctrl`), e o app pode perguntar se quer salvar; sem janela, SIGTERM.
+  Processos essenciais (KWin, plasmashell, PipeWire, systemd, D-Bus, gerenciador de login...) pedem confirmação extra.
   - **Encerrados**: histórico dos processos que já terminaram (quando, quanto duraram, quem os iniciou).
   - **Suspeitos**: processos vivos ou encerrados com sinais comuns em malware.
   - **Analisar**: o que é o processo (pacote e descrição), executável, SHA-256 + link do VirusTotal,
+    se o executável ainda é igual ao que o pacote instalou,
     cadeia de processos pais, serviço systemd, portas e conexões, LD_PRELOAD.
 - **Controles**: áudio (mídia tocando com ⏮ ⏯ ⏭ e ±10 s, saída fone/HDMI, volume, por aplicativo, microfone), tela (resolução, brilho,
   apagar/espera) e captura de tela (sempre com aviso no PC).
@@ -116,7 +119,8 @@ executável apagado do disco ou rodando da memória (memfd); executável em `/tm
 ou com nome oculto; nome imitando thread do kernel (`[kworker/...]`); comando de shell reverso,
 `curl | sh`, `base64 -d | sh`, minerador (`stratum+tcp`, xmrig); `LD_PRELOAD` desconhecido;
 arquivo em pasta do sistema que não é de nenhum pacote; root rodando binário fora dos pacotes;
-porta aberta para a rede por binário fora dos pacotes. Processos em container (Flatpak, Steam Runtime)
+porta aberta para a rede por binário fora dos pacotes; executável diferente do que o pacote instalou (só na análise
+detalhada: compara o SHA-256 com o banco do `pacman`, os `md5sums` do `dpkg` ou o `rpm --dump`). Processos em container (Flatpak, Steam Runtime)
 são reconhecidos e não disparam as regras de pacote. **Não é um antivírus**: programas legítimos
 podem disparar algum sinal. Dá para marcar um executável como confiável (fica em `data/trusted.json`).
 
@@ -190,7 +194,8 @@ Se o Goverlay regravar o MangoHud.conf, desligue e ligue de novo.
 volume/mudo de cada saída, volume/mudo/saída **de cada aplicativo**, microfone (mudo, volume, entrada padrão)
 e quais apps estão usando o microfone.
 
-**Tela** (KDE): resolução e taxa de atualização via `kscreen-doctor`. Toda mudança precisa ser confirmada
+**Tela** (KDE): cada monitor com o nome real (lido do EDID, ex.: "LG ULTRAGEAR"), tipo de conexão, escala em % e
+qual é o principal. Resolução e taxa de atualização via `kscreen-doctor`. Toda mudança precisa ser confirmada
 em 20 s; sem confirmação volta ao modo anterior (proteção contra tela preta). **Brilho/contraste** via DDC/CI
 (`ddcutil`, o monitor precisa ter DDC/CI ligado no menu). **Apagar tela** põe brilho e contraste em 0: a tela
 fica praticamente preta mas o monitor continua ligado e conectado (ao contrário de desligar no botão, que em
@@ -240,7 +245,9 @@ pois no ntfy.sh público quem souber o nome lê as mensagens). Há um botão de 
 
 *Sistema > Atualizações pendentes*: `checkupdates` + AUR (`paru`/`yay -Qua`) + Flatpak no Arch,
 `apt`/`dnf` em outras distros. Verifica sozinho a cada 6 h. Kernel, drivers DKMS e pacotes de sistema
-(mesa, systemd, gerenciador de login...) aparecem destacados. **O painel não instala atualizações**.
+(mesa, systemd, gerenciador de login...) aparecem destacados. Avisa quando o PC **precisa reiniciar** (kernel novo
+instalado e o antigo ainda rodando; `/run/reboot-required` no Debian/Ubuntu; `needs-restarting -r` no Fedora).
+**O painel não instala atualizações**.
 
 ## Desligar / reiniciar
 
@@ -373,7 +380,7 @@ e adicione em `web/js/modules/index.js`. Use `app.onSnapshot(fn)` para receber d
 | GET | `/api/stream` | Server-Sent Events com um snapshot por segundo |
 | GET | `/api/history?keys=cpu.total,gpu.0.busy` | séries temporais |
 | GET | `/api/processes` | lista completa de processos |
-| POST | `/api/processes/<pid>/signal` | `{"signal": "TERM"\|"KILL"\|"STOP"\|"CONT", "create_time": ...}` |
+| POST | `/api/processes/<pid>/signal` | `{"signal": "TERM"\|"KILL"\|"STOP"\|"CONT", "create_time": ..., "confirm_critical": true}`; TERM fecha as janelas (`closed_windows`) ou manda SIGTERM; processo essencial sem `confirm_critical` → 409 `{"critical": true}` |
 | GET | `/api/processes/exited` | histórico de encerrados |
 | POST | `/api/processes/exited/clear` | limpa o histórico |
 | GET | `/api/processes/suspicious` | processos com sinais de atenção (`?info=1` inclui os informativos) |
@@ -394,12 +401,12 @@ e adicione em `web/js/modules/index.js`. Use `app.onSnapshot(fn)` para receber d
 | GET/POST | `/api/game` | jogo atual e FPS; `{"fps_enabled": true}` liga a leitura |
 | POST | `/api/media` | `{"player": "spotify", "op": "play_pause"\|"next"\|"previous"\|"seek", "offset": 10}` (offset em segundos, só no seek) |
 | GET/POST | `/api/audio` | estado do áudio; `{"op": "set_default"\|"volume"\|"mute"\|"move", ...}` |
-| GET | `/api/display` | monitores e modos |
+| GET | `/api/display` | monitores (`label` do EDID, `connector`, `primary`, `scale`) e modos |
 | POST | `/api/display/mode` | `{"output","mode"}` aplica (reverte em 20 s); `{"op":"confirm"\|"revert"}` |
 | GET/POST | `/api/display/ddc` | brilho/contraste; `{"bus", "brightness"/"contrast"}` ou `{"bus","op":"dim"\|"restore"}` |
 | POST | `/api/display/dpms` | `{"on": false}` põe o monitor em espera |
 | GET/POST | `/api/power/timer` | `{"action":"poweroff","minutes":60}` agenda (forçado); `{"cancel":true}` |
-| GET | `/api/updates` | atualizações pendentes; `POST /api/updates/refresh` verifica agora |
+| GET | `/api/updates` | atualizações pendentes e `reboot` (precisa reiniciar?); `POST /api/updates/refresh` verifica agora |
 | GET | `/api/alerts` | histórico; `POST /api/alerts/read`, `/api/alerts/clear`, `/api/alerts/test` |
 | GET/POST | `/api/alerts/config` | regras e canais |
 | POST | `/api/screenshot` | captura (avisa na tela do PC); `GET /api/screenshots`, `/api/screenshots/<nome>` |

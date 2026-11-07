@@ -18,6 +18,7 @@ export function openProcessSheet(app, proc, onDone) {
       ${proc.ppid != null ? `<dt>PID pai</dt><dd>${proc.ppid}</dd>` : ""}
       <dt>Iniciado</dt><dd>${started}</dd>
     </dl>
+    ${proc.critical && canKill ? `<p class="fan-alert warning" style="margin:8px 0">⚠ Processo essencial do sistema: finalizá-lo pode derrubar a sessão gráfica, o som ou a rede.</p>` : ""}
     <div class="confirm-text" hidden></div>
     <div class="sheet-actions">
       ${app.info?.features?.exited ? `<button class="btn full" data-inspect>Analisar processo</button>` : ""}
@@ -37,20 +38,30 @@ export function openProcessSheet(app, proc, onDone) {
       dlg.querySelectorAll("[data-sig]").forEach(b => (b.textContent = b.dataset.sig === "TERM" ? "Finalizar" : "Forçar (kill -9)"));
       btn.textContent = "Toque de novo para confirmar";
       confirmEl.hidden = false;
-      confirmEl.textContent = sig === "KILL"
+      confirmEl.textContent = (sig === "KILL"
         ? `Forçar o encerramento de "${proc.name}" imediatamente? Dados não salvos serão perdidos.`
-        : `Pedir para "${proc.name}" encerrar (SIGTERM)?`;
+        : `Pedir para "${proc.name}" fechar (como clicar no X)? Ele pode perguntar se você quer salvar. Processos sem janela recebem SIGTERM.`)
+        + (proc.critical ? " ⚠ É um processo essencial do sistema." : "");
       return;
     }
     btn.disabled = true;
     try {
-      await app.api(`/api/processes/${proc.pid}/signal`, { method: "POST", body: { signal: sig, create_time: proc.create_time } });
-      toast(`${sig === "KILL" ? "Forçado" : "Sinal enviado"}: ${proc.name} (PID ${proc.pid})`);
+      const r = await app.api(`/api/processes/${proc.pid}/signal`, { method: "POST",
+        body: { signal: sig, create_time: proc.create_time, confirm_critical: !!proc.critical } });
+      toast(sig === "KILL" ? `Forçado: ${proc.name} (PID ${proc.pid})`
+        : r.closed_windows ? `Pedido de fechar enviado a ${proc.name} (${r.closed_windows} janela${r.closed_windows > 1 ? "s" : ""})`
+        : `Sinal enviado: ${proc.name} (PID ${proc.pid})`);
       dlg.close();
       onDone?.();
     } catch (e) {
-      toast(e.message, true);
       btn.disabled = false;
+      if (e.data?.critical && !proc.critical) {   // aberto de uma lista sem a marca de crítico: pede de novo
+        proc.critical = true;
+        confirmEl.textContent = `⚠ ${e.message}`;
+        btn.textContent = "Toque de novo para confirmar";
+        return;
+      }
+      toast(e.message, true);
     }
   }));
   dlg.querySelector("[data-close]").addEventListener("click", () => dlg.close());

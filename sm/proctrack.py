@@ -156,6 +156,7 @@ class ProcessTracker:
         self.started_at = time.time()
         self._lock = threading.Lock()
         self._stop = threading.Event()
+        self._n = 0
         self._load()
 
     # ---------- persistência ----------
@@ -204,13 +205,33 @@ class ProcessTracker:
     def _ignored(self, rec: dict) -> bool:
         return rec["ppid"] == self.self_pid or rec["pid"] == self.self_pid
 
+    def _reused(self, pids: set[int]) -> set[int]:
+        """PIDs conhecidos que agora são outro processo (horário de início diferente do registrado).
+        Raro no Linux (pid_max de 4 milhões), mas acontece em quem cria muitos processos."""
+        out = set()
+        with self._lock:
+            ids = {pid: self.live[pid]["id"] for pid in pids if pid in self.live}
+        for pid, rid in ids.items():
+            stat = _read(f"/proc/{pid}/stat", 1024)
+            if not stat:
+                continue
+            try:
+                ticks = stat[stat.rfind(")") + 2:].split()[19]
+            except IndexError:
+                continue
+            if rid != f"{pid}-{ticks}":
+                out.add(pid)
+        return out
+
     def _scan(self, initial: bool = False) -> None:
         now = time.time()
+        self._n += 1
         pids = {int(p) for p in os.listdir("/proc") if p.isdigit()}
         with self._lock:
             known = set(self.live)
-        new = pids - known
-        gone = known - pids
+        reused = self._reused(known & pids) if self._n % 2 == 0 else set()    # a cada ~1 s
+        new = (pids - known) | reused
+        gone = (known - pids) | reused
         recs = {}
         for pid in new:
             rec = capture(pid, self.boot, self.users)
@@ -219,9 +240,9 @@ class ProcessTracker:
             rec["preexisting"] = initial
             recs[pid] = rec
         with self._lock:
-            # (reuso de PID dentro de um intervalo é ignorado: pid_max é 4M no Linux moderno)
             for pid in gone:
-                self._finish(self.live.pop(pid), now)
+                if pid in self.live:
+                    self._finish(self.live.pop(pid), now)
             for pid, rec in recs.items():
                 parent = self.live.get(rec["ppid"])
                 rec["parent_name"] = parent["name"] if parent else None

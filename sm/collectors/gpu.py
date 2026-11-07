@@ -18,6 +18,7 @@ class Gpu(Collector):
     def collect(self) -> dict:
         out = []
         fd_busy = self.ctx.drm.per_device_busy
+        fd_engines = self.ctx.drm.per_device_engines
         for i, g in enumerate(self.gpus):
             try:
                 s = g.sample()
@@ -26,6 +27,8 @@ class Gpu(Collector):
             if s.get("busy") is None and s.get("id") in fd_busy:
                 s["busy"] = round(fd_busy[s["id"]], 1)
                 s["busy_source"] = "fdinfo"
+            # uso por tipo de engine (3D, compute, vídeo...), somando os processos visíveis
+            s["engines"] = {**fd_engines.get(s.get("id"), {}), **(s.get("engines") or {})}   # NVML tem prioridade
             self.record(f"gpu.{i}.busy", s.get("busy"))
             self.record(f"gpu.{i}.temp", s.get("temp"))
             out.append(s)

@@ -7,11 +7,16 @@ janela em foco, no máximo a cada 10 s), escreve uma linha "SMFOCUS {...}" no lo
 Custo: zero quando nada muda; uma linha no journal por troca de janela.
 
 Outros ambientes X11: lê a janela ativa com `xprop` a cada coleta.
+
+Fechar as janelas de um processo ("Finalizar" educado, como clicar no X): no KDE, um script de uma vez só no
+KWin chama `closeWindow()` nas janelas do PID e responde no journal ("SMCLOSE <token> <n>"); em outros X11,
+`wmctrl -ic`. O app pode perguntar se quer salvar. Sem janela, quem chama manda SIGTERM.
 """
 from __future__ import annotations
 
 import json
 import logging
+import secrets
 import shutil
 import subprocess
 import threading
@@ -50,6 +55,21 @@ report(active());
 """
 
 
+CLOSE_MARK = "SMCLOSE "
+CLOSE_SCRIPT = r"""
+// self-monitoring: fecha as janelas de um processo (como clicar no X) e informa quantas
+(function () {
+  const list = workspace.windowList ? workspace.windowList() : workspace.clientList();
+  let n = 0;
+  for (let i = 0; i < list.length; i++) {
+    const w = list[i];
+    if (w.pid === %d && (w.normalWindow || w.dialog) && !w.deleted) { w.closeWindow(); n++; }
+  }
+  print("SMCLOSE %s " + n);
+})();
+"""
+
+
 def _busctl(*args: str, timeout: float = 5) -> subprocess.CompletedProcess:
     return subprocess.run(as_user(["busctl", "--user", *args]), capture_output=True, text=True, timeout=timeout,
                           env=user_env())
@@ -81,6 +101,7 @@ class FocusMonitor:
         self._session: dict | None = None
         self.mode: str | None = None      # kwin | x11 | None
         self.script_file = ROOT / "data" / "kwin-focus.js"
+        self._closing: dict[str, dict] = {}    # token -> {"ev", "n"} (pedidos de fechar janelas)
 
     # ---------- KWin ----------
     def kwin_available(self) -> bool:
@@ -97,29 +118,93 @@ class FocusMonitor:
             return False
         return r.returncode == 0 and r.stdout.strip() == "b true"
 
+    def _run_script(self, path, name: str) -> bool:
+        """Carrega e executa um script no KWin (descarrega antes um de mesmo nome)."""
+        _busctl("call", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "unloadScript", "s", name)
+        r = _busctl("call", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "loadScript", "ss", str(path), name)
+        if r.returncode:
+            log.warning("KWin recusou o script %s: %s", name, r.stderr.strip())
+            return False
+        sid = r.stdout.split()[-1]
+        if sid == "-1":
+            return False
+        # KWin 6: /Scripting/ScriptN; KWin 5: /N
+        for obj in (f"/Scripting/Script{sid}", f"/{sid}"):
+            if _busctl("call", "org.kde.KWin", obj, "org.kde.kwin.Script", "run").returncode == 0:
+                return True
+        return False
+
     def _load_script(self) -> bool:
         try:
             self.script_file.parent.mkdir(parents=True, exist_ok=True)
             self.script_file.write_text(SCRIPT)
             self.script_file.chmod(0o644)
-            # versão anterior (outra execução do painel): descarrega e carrega a atual
-            _busctl("call", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "unloadScript", "s", SCRIPT_NAME)
-            r = _busctl("call", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "loadScript", "ss",
-                        str(self.script_file), SCRIPT_NAME)
-            if r.returncode:
-                log.warning("KWin recusou o script de foco: %s", r.stderr.strip())
-                return False
-            sid = r.stdout.split()[-1]
-            if sid == "-1":
-                return False
-            # KWin 6: /Scripting/ScriptN; KWin 5: /N
-            for path in (f"/Scripting/Script{sid}", f"/{sid}"):
-                if _busctl("call", "org.kde.KWin", path, "org.kde.kwin.Script", "run").returncode == 0:
-                    log.info("script de janela em foco carregado no KWin")
-                    return True
+            # versão anterior (outra execução do painel) é descarregada e a atual carregada
+            if self._run_script(self.script_file, SCRIPT_NAME):
+                log.info("script de janela em foco carregado no KWin")
+                return True
         except (OSError, subprocess.SubprocessError) as e:
             log.warning("falha ao carregar o script de foco no KWin: %s", e)
         return False
+
+    # ---------- fechar as janelas de um processo ----------
+    def close_windows(self, pid: int, timeout: float = 2.0) -> int | None:
+        """Pede para as janelas do processo fecharem. Devolve quantas, ou None se não deu para saber
+        (sem KWin/X11, ou o KWin não respondeu a tempo)."""
+        if self.mode is None:
+            self.tick(force=True)
+        try:
+            if self.mode == "kwin":
+                return self._kwin_close(int(pid), timeout)
+            if self.mode == "x11":
+                return self._x11_close(int(pid))
+        except (OSError, subprocess.SubprocessError) as e:
+            log.warning("falha ao fechar as janelas do PID %s: %s", pid, e)
+        return None
+
+    def _kwin_close(self, pid: int, timeout: float) -> int | None:
+        token = secrets.token_hex(6)
+        name = f"self-monitoring-close-{token}"
+        path = self.script_file.with_name(f"kwin-close-{token}.js")
+        ev = threading.Event()
+        with self.lock:
+            self._closing[token] = {"ev": ev, "n": None}
+        try:
+            path.write_text(CLOSE_SCRIPT % (pid, token))
+            path.chmod(0o644)
+            if not self._run_script(path, name):
+                return None
+            ev.wait(timeout)
+            with self.lock:
+                return self._closing[token]["n"]
+        finally:
+            with self.lock:
+                self._closing.pop(token, None)
+            try:
+                _busctl("call", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "unloadScript", "s", name)
+            except (OSError, subprocess.SubprocessError):
+                pass
+            path.unlink(missing_ok=True)
+
+    def _close_reply(self, line: str) -> None:
+        parts = line[line.find(CLOSE_MARK) + len(CLOSE_MARK):].split()
+        if len(parts) < 2 or not parts[1].isdigit():
+            return
+        with self.lock:
+            w = self._closing.get(parts[0])
+            if w:
+                w["n"] = int(parts[1])
+                w["ev"].set()
+
+    def _x11_close(self, pid: int) -> int | None:
+        if not shutil.which("wmctrl"):
+            return None
+        env = session_env()
+        out = subprocess.run(["wmctrl", "-lp"], capture_output=True, text=True, timeout=3, env=env).stdout
+        ids = [f[0] for f in (line.split() for line in out.splitlines()) if len(f) > 2 and f[2] == str(pid)]
+        for wid in ids:
+            subprocess.run(["wmctrl", "-ic", wid], capture_output=True, timeout=3, env=env)
+        return len(ids)
 
     def _follow(self) -> None:
         """Acompanha o journal do usuário (só mensagens do processo do KWin)."""
@@ -129,6 +214,9 @@ class FocusMonitor:
                     as_user(["journalctl", "--user", "-f", "-n", "0", "-o", "cat", "_COMM=kwin_wayland", "_COMM=kwin_x11"]),
                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env=user_env())
                 for line in self.proc.stdout:
+                    if CLOSE_MARK in line:
+                        self._close_reply(line)
+                        continue
                     ours, w = parse_line(line)
                     if ours:
                         self._set(w, "kwin")
@@ -189,11 +277,11 @@ class FocusMonitor:
         return w
 
     # ---------- estado ----------
-    def tick(self) -> None:
+    def tick(self, force: bool = False) -> None:
         """Chamado pelo coletor. A cada 30 s: vê se há sessão/KWin e garante o script carregado
         (o KWin o perde ao reiniciar ou relogar)."""
         now = time.time()
-        if now - self._last_check < 30:
+        if now - self._last_check < 30 and not force:
             return
         self._last_check = now
         self._session = graphical_session()

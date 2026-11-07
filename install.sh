@@ -137,6 +137,25 @@ if [[ $SERVICE -eq 1 ]]; then
   elif command -v firewall-cmd >/dev/null && systemctl is-active -q firewalld; then
     firewall-cmd --permanent --add-port="$PORT/tcp" >/dev/null && firewall-cmd --reload >/dev/null || true
     echo "firewalld: porta $PORT liberada."
+  else
+    # outro firewall (nftables/iptables direto) bloqueando a entrada: o instalador não mexe, só avisa
+    FW_DROP=""
+    if command -v nft >/dev/null && nft list ruleset 2>/dev/null | grep -Eq 'hook input .*policy drop'; then
+      nft list ruleset 2>/dev/null | grep -Eq "dport [^;]*\b$PORT\b[^;]*accept" || FW_DROP=nftables
+    elif command -v iptables >/dev/null && iptables -S INPUT 2>/dev/null | grep -Eq '^-P INPUT (DROP|REJECT)'; then
+      iptables -S INPUT 2>/dev/null | grep -Eq -- "--dport $PORT( |$).*-j ACCEPT" || FW_DROP=iptables
+    fi
+    if [[ -n "$FW_DROP" ]]; then
+      echo "⚠ O firewall ($FW_DROP) bloqueia conexões de entrada e a porta $PORT não está liberada:"
+      echo "  o painel não vai abrir pelo celular. Libere a porta para a rede local, por exemplo:"
+      if [[ "$FW_DROP" == nftables ]]; then
+        echo "    sudo nft add rule inet filter input ip saddr 192.168.0.0/16 tcp dport $PORT accept"
+        echo "  (o nome da tabela/cadeia pode ser outro: veja  sudo nft list ruleset; e grave em /etc/nftables.conf)"
+      else
+        echo "    sudo iptables -I INPUT -s 192.168.0.0/16 -p tcp --dport $PORT -j ACCEPT"
+        echo "  (e torne a regra permanente: iptables-save > /etc/iptables/iptables.rules)"
+      fi
+    fi
   fi
   if ! [[ -f "$DEST/data/auth.json" ]] && [[ -t 0 ]]; then
     echo; echo "Nenhuma senha cadastrada ainda."

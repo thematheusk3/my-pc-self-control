@@ -1,10 +1,13 @@
 """Detecção e leitura de GPUs (AMD, NVIDIA, Intel), com tratamento de quirks.
 
+NVIDIA: NVML (libnvidia-ml.so.1, instalada com o driver) via ctypes; sem ela, cai para o nvidia-smi.
+
 Para adicionar outro fabricante, crie uma classe com `discover()` (classmethod
 que retorna instâncias) e `sample() -> dict`, e registre em BACKENDS.
 """
 from __future__ import annotations
 
+import ctypes
 import re
 import shutil
 import subprocess
@@ -162,16 +165,113 @@ class IntelGpu:
         }
 
 
+# ---------- NVML (biblioteca do driver NVIDIA) ----------
+class _NvUtil(ctypes.Structure):
+    _fields_ = [("gpu", ctypes.c_uint), ("memory", ctypes.c_uint)]
+
+
+class _NvMem(ctypes.Structure):
+    _fields_ = [("total", ctypes.c_ulonglong), ("free", ctypes.c_ulonglong), ("used", ctypes.c_ulonglong)]
+
+
+class _NvPci(ctypes.Structure):
+    _fields_ = [("busIdLegacy", ctypes.c_char * 16), ("domain", ctypes.c_uint), ("bus", ctypes.c_uint),
+                ("device", ctypes.c_uint), ("pciDeviceId", ctypes.c_uint), ("pciSubSystemId", ctypes.c_uint),
+                ("busId", ctypes.c_char * 32)]
+
+
+class Nvml:
+    """libnvidia-ml.so.1 via ctypes: o mesmo que o nvidia-smi lê, sem abrir um processo por segundo."""
+
+    def __init__(self) -> None:
+        self.lib = None
+        for path in ("libnvidia-ml.so.1", "libnvidia-ml.so"):
+            try:
+                self.lib = ctypes.CDLL(path)
+                break
+            except OSError:
+                continue
+        try:
+            if self.lib is not None and self.lib.nvmlInit_v2():
+                self.lib = None
+        except AttributeError:
+            self.lib = None
+
+    def devices(self) -> list[tuple[ctypes.c_void_p, str, str]]:
+        """[(handle, pci "0000:01:00.0", nome)]"""
+        if not self.lib:
+            return []
+        n = ctypes.c_uint()
+        if self.lib.nvmlDeviceGetCount_v2(ctypes.byref(n)):
+            return []
+        out = []
+        for i in range(n.value):
+            h = ctypes.c_void_p()
+            if self.lib.nvmlDeviceGetHandleByIndex_v2(ctypes.c_uint(i), ctypes.byref(h)):
+                continue
+            pci = _NvPci()
+            if self.lib.nvmlDeviceGetPciInfo_v3(h, ctypes.byref(pci)):
+                continue
+            name = ctypes.create_string_buffer(96)
+            self.lib.nvmlDeviceGetName(h, name, ctypes.c_uint(96))
+            out.append((h, pci.busId.decode(errors="replace").lower()[4:], name.value.decode(errors="replace")))
+        return out
+
+    def _uint(self, fn: str, h, *args) -> int | None:
+        v = ctypes.c_uint()
+        try:
+            return v.value if getattr(self.lib, fn)(h, *args, ctypes.byref(v)) == 0 else None
+        except AttributeError:
+            return None
+
+    def _codec(self, fn: str, h) -> int | None:
+        util, period = ctypes.c_uint(), ctypes.c_uint()
+        try:
+            return util.value if getattr(self.lib, fn)(h, ctypes.byref(util), ctypes.byref(period)) == 0 else None
+        except AttributeError:
+            return None
+
+    def sample(self, h) -> dict:
+        lib = self.lib
+        u, m = _NvUtil(), _NvMem()
+        busy = u.gpu if lib.nvmlDeviceGetUtilizationRates(h, ctypes.byref(u)) == 0 else None
+        mem = {"used": m.used, "total": m.total} if lib.nvmlDeviceGetMemoryInfo(h, ctypes.byref(m)) == 0 else None
+        temp = self._uint("nvmlDeviceGetTemperature", h, ctypes.c_int(0))      # NVML_TEMPERATURE_GPU
+        mw = self._uint("nvmlDeviceGetPowerUsage", h)
+        sclk = self._uint("nvmlDeviceGetClockInfo", h, ctypes.c_int(0))        # NVML_CLOCK_GRAPHICS
+        mclk = self._uint("nvmlDeviceGetClockInfo", h, ctypes.c_int(2))        # NVML_CLOCK_MEM
+        fan = self._uint("nvmlDeviceGetFanSpeed", h)
+        engines = {k: float(v) for k, v in (("gfx", busy), ("enc", self._codec("nvmlDeviceGetEncoderUtilization", h)),
+                                             ("dec", self._codec("nvmlDeviceGetDecoderUtilization", h)))
+                   if v is not None}
+        return {"busy": busy, "temp": temp, "power": round(mw / 1000, 1) if mw is not None else None,
+                "clocks": {k: v for k, v in (("sclk", sclk), ("mclk", mclk)) if v is not None},
+                "fan_pct": fan, "vram": mem, "engines": engines}
+
+
+_NVML: Nvml | None = None
+
+
+def nvml() -> Nvml:
+    global _NVML
+    if _NVML is None:
+        _NVML = Nvml()
+    return _NVML
+
+
 class NvidiaGpu:
     vendor = "NVIDIA"
     FIELDS = "index,pci.bus_id,name,utilization.gpu,temperature.gpu,power.draw,clocks.gr,clocks.mem,memory.used,memory.total,fan.speed"
 
-    def __init__(self, index: int, pci: str, name: str) -> None:
-        self.index, self.pci, self.name = index, pci, name
+    def __init__(self, index: int | None, pci: str, name: str, handle=None) -> None:
+        self.index, self.pci, self.name, self.handle = index, pci, name, handle
 
     @classmethod
     def discover(cls) -> list["NvidiaGpu"]:
-        if not shutil.which("nvidia-smi"):
+        devs = nvml().devices()
+        if devs:
+            return [cls(None, pci, name, handle=h) for h, pci, name in devs]
+        if not shutil.which("nvidia-smi"):       # plano B: sem a biblioteca do driver
             return []
         try:
             out = subprocess.run(["nvidia-smi", "--query-gpu=index,pci.bus_id,name", "--format=csv,noheader"],
@@ -192,7 +292,17 @@ class NvidiaGpu:
         except ValueError:
             return None
 
+    def _base(self) -> dict:
+        return {"id": self.pci, "vendor": self.vendor, "name": self.name, "driver": "nvidia",
+                "integrated": False, "temp_source": "gpu", "fan": None, "gtt": None, "notes": []}
+
     def sample(self) -> dict:
+        if self.handle is not None:
+            nv = nvml().sample(self.handle)
+            t = nv["temp"]
+            return {**self._base(), "busy": nv["busy"], "busy_source": "nvml", "temp": t,
+                    "temps": {"gpu": t} if t is not None else {}, "power": nv["power"], "clocks": nv["clocks"],
+                    "fan_pct": nv["fan_pct"], "vram": nv["vram"], "engines": nv["engines"]}
         vals: list[str] = []
         try:
             out = subprocess.run(["nvidia-smi", f"--id={self.index}", f"--query-gpu={self.FIELDS}",
@@ -204,13 +314,11 @@ class NvidiaGpu:
         mib = 1024**2
         used, total = g(8), g(9)
         return {
-            "id": self.pci, "vendor": self.vendor, "name": self.name, "driver": "nvidia",
-            "integrated": False, "busy": g(3), "temp": g(4), "temp_source": "gpu",
+            **self._base(), "busy": g(3), "temp": g(4),
             "temps": {"gpu": g(4)} if g(4) is not None else {}, "power": g(5),
             "clocks": {k: v for k, v in (("sclk", g(6)), ("mclk", g(7))) if v is not None},
-            "fan": None, "fan_pct": g(10),
+            "fan_pct": g(10),
             "vram": {"used": used * mib, "total": total * mib} if used is not None and total else None,
-            "gtt": None, "notes": [],
         }
 
 

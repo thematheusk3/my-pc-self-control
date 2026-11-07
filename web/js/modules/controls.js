@@ -205,8 +205,8 @@ function renderDisplay() {
     const groups = {};
     for (const m of o.modes) (groups[`${m.w}x${m.h}`] ||= []).push(m);
     return `<article class="card">
-      <div class="card-head"><div><div class="card-title">Monitor ${esc(o.name)}</div>
-        <div class="card-sub">${o.current ? `${o.current.w}x${o.current.h} @ ${o.current.hz} Hz` : "—"} · escala ${o.scale}</div></div></div>
+      <div class="card-head"><div><div class="card-title">${esc(o.label || `Monitor ${o.name}`)}${o.primary ? ` <span class="chip">principal</span>` : ""}</div>
+        <div class="card-sub">${o.current ? `${o.current.w}x${o.current.h} @ ${o.current.hz} Hz` : "—"}${o.scale ? ` · escala ${Math.round(o.scale * 100)}%` : ""}${o.connector ? ` · ${esc(o.connector)}` : ""}</div></div></div>
       <label class="stat-label" for="mode-${esc(o.name)}">Resolução e taxa de atualização</label>
       <select class="search" id="mode-${esc(o.name)}" style="width:100%;margin-top:4px" data-mode-sel="${esc(o.name)}">
         ${Object.entries(groups).map(([res, ms]) => `<optgroup label="${res}">${ms.map(m => `<option value="${m.id}" ${o.current?.id === m.id ? "selected" : ""}>${m.w}x${m.h} @ ${m.hz} Hz${o.preferred.includes(m.id) ? " (recomendado)" : ""}</option>`).join("")}</optgroup>`).join("")}

@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import glob
 import json
 import re
 import shutil
@@ -47,8 +48,46 @@ def _kscreen(*args: str, json_out: bool = False):
     return r.stdout
 
 
+# KScreen::Output::Type
+CONNECTOR_TYPES = {1: "VGA", 2: "DVI", 3: "DVI", 4: "DVI", 5: "DVI", 6: "HDMI", 7: "Tela embutida", 8: "TV", 14: "DisplayPort"}
+CONNECTOR_PREFIX = (("eDP", "Tela embutida"), ("DP", "DisplayPort"), ("HDMI", "HDMI"), ("DVI", "DVI"), ("VGA", "VGA"),
+                    ("LVDS", "Tela embutida"), ("DSI", "Tela embutida"))
+
+
+def edid_name(edid: bytes) -> str | None:
+    """Nome do monitor no EDID (descritor 0xFC, ex.: "LG ULTRAGEAR")."""
+    for i in range(54, 126, 18):
+        d = edid[i:i + 18]
+        if len(d) == 18 and d[:3] == b"\0\0\0" and d[3] == 0xFC:
+            name = d[5:18].split(b"\n")[0].decode("cp437", errors="replace").strip()
+            return name or None
+    return None
+
+
+def edid_names() -> dict[str, str]:
+    """Saída (DP-4, HDMI-A-1...) -> nome do monitor, lido do EDID em /sys/class/drm (não precisa de root)."""
+    out = {}
+    for path in glob.glob("/sys/class/drm/card*-*/edid"):
+        try:
+            with open(path, "rb") as f:
+                data = f.read(512)
+        except OSError:
+            continue
+        name = edid_name(data) if data else None
+        if name:
+            out[path.split("/")[-2].split("-", 1)[1]] = name
+    return out
+
+
+def connector_label(name: str, kind: int | None) -> str | None:
+    if kind in CONNECTOR_TYPES:
+        return CONNECTOR_TYPES[kind]
+    return next((label for prefix, label in CONNECTOR_PREFIX if name.startswith(prefix)), None)
+
+
 def outputs() -> list[dict]:
     out = []
+    names = edid_names()
     for o in _kscreen(json_out=True).get("outputs", []):
         if not o.get("connected"):
             continue
@@ -58,7 +97,12 @@ def outputs() -> list[dict]:
                           "hz": round(m["refreshRate"], 2)})
         modes.sort(key=lambda m: (-m["w"] * m["h"], -m["hz"]))
         cur = next((m for m in modes if m["id"] == str(o.get("currentModeId"))), None)
+        # Plasma 6: "priority" 1 = principal; Plasma 5: "primary"
+        primary = o.get("priority") == 1 if "priority" in o else bool(o.get("primary"))
+        label = names.get(o["name"])
         out.append({"name": o["name"], "enabled": o.get("enabled"), "current": cur, "modes": modes,
+                    "label": f"{label} ({o['name']})" if label else None, "primary": primary,
+                    "connector": connector_label(o["name"], o.get("type")),
                     "scale": o.get("scale"), "vrr": o.get("vrrPolicy"), "hdr": o.get("hdr"),
                     "preferred": [str(x) for x in o.get("preferredModes", [])]})
     return out
