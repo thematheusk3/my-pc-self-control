@@ -83,12 +83,18 @@ def main() -> None:
     from sm.alerts import Alerts
     from sm.game import GameMonitor
     from sm.power import PowerTimer
+    from sm.mural import Mural
+    from sm.selfupdate import SelfUpdate
     from sm.updates import Updates
+    from sm.webhook import Webhook
     ctx.game = GameMonitor(ctx)
     ctx.updates = Updates()
+    ctx.selfupdate = SelfUpdate(cfg.update_repo, cfg.update_check)
+    ctx.mural = Mural()
     ctx.power_timer = PowerTimer() if cfg.allow_power else None
     ctx.alerts = Alerts(ctx)
     ctx.alerts.start()
+    ctx.webhook = Webhook(ctx.alerts)
     Sampler(ctx).start()
     srv = make_server(ctx)
 

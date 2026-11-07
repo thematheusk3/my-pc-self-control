@@ -1,3 +1,4 @@
+import { ic } from "../icons.js";
 import { $, bytes, esc, pct } from "../ui.js";
 import { openProcessSheet } from "../procsheet.js";
 import { exitedView, suspiciousView } from "../procviews.js";
@@ -154,4 +155,4 @@ function render() {
       <span class="vals">${bytes(p.mem)}</span></li>`).join("") || `<li class="empty">Nenhum processo encontrado.</li>`;
 }
 
-export default { id: "processes", title: "Processos", icon: "☰", mount, route, show: showCur, hide: hideAll };
+export default { id: "processes", title: "Processos", icon: ic("rows"), mount, route, show: showCur, hide: hideAll };

@@ -84,6 +84,19 @@ class DispatchTest(_Tmp):
         self.assertEqual(items[0]["device"], "iPhone · navegador")
         self.assertEqual(items[0]["ip"], "127.0.0.1")
 
+    def test_not_game_route(self):
+        game = self.srv.RequestHandlerClass.ctx.game = mock.Mock()
+        game.set_not_game.return_value = {}
+        self.assertEqual(self.post("/api/game/not-game", {"key": "exe:tabby.exe", "name": "Tabby"}), 200)
+        game.set_not_game.assert_called_with("exe:tabby.exe", "Tabby", True)
+        self.assertEqual(self.post("/api/game/not-game", {"key": "exe:tabby.exe", "ignored": False}), 200)
+        game.set_not_game.assert_called_with("exe:tabby.exe", None, False)
+        game.set_not_game.side_effect = ValueError("Jogo inválido.")
+        self.assertEqual(self.post("/api/game/not-game", {"key": "../x"}), 400)
+        items = self.srv.RequestHandlerClass.audit.list()
+        self.assertEqual(items[-1]["text"], "Marcar Tabby como app que não é jogo")
+        self.assertEqual(items[-1]["cat"], "game")
+
 
 if __name__ == "__main__":
     unittest.main()

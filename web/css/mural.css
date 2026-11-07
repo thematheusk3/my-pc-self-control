@@ -1,0 +1,269 @@
+/* Mural: tela cheia vista de longe. Três cores vivas (--m-deep, --m-mid, --m-accent) vêm da arte ou do céu da cidade
+   (mural-palette.js) e mudam com transição; o texto é sempre claro, e a paleta garante o contraste.
+   Os tamanhos vêm da tela (vmin), do celular à TV. */
+
+@property --m-deep { syntax: "<color>"; inherits: true; initial-value: #0a1915; }
+@property --m-mid { syntax: "<color>"; inherits: true; initial-value: #17352c; }
+@property --m-accent { syntax: "<color>"; inherits: true; initial-value: #e8be57; }
+
+.mural {
+  position: fixed; inset: 0; z-index: 100; overflow: hidden; display: block; cursor: none;
+  color-scheme: dark; color: #f6f8f4; --dim: #dbe4de; --pad: clamp(18px, 4.5vmin, 64px); --glass-r: clamp(16px, 2.6vmin, 30px);
+  background:
+    radial-gradient(90vmax 70vmax at 82% -8%, color-mix(in srgb, var(--m-mid) 92%, white 8%), transparent 68%),
+    radial-gradient(80vmax 60vmax at -8% 108%, var(--m-mid), transparent 62%),
+    var(--m-deep);
+  transition: --m-deep 1.4s ease, --m-mid 1.4s ease, --m-accent 1.4s ease;
+}
+.mural.awake { cursor: default; }
+body.mural-open { overflow: hidden; }
+
+/* arte: duas camadas para trocar com fade; deriva bem devagar, o que dá vida e poupa telas OLED */
+.mural-bg { position: absolute; inset: -3%; width: 106%; height: 106%; object-fit: cover; opacity: 0; transition: opacity 1.2s ease; animation: mural-drift 70s ease-in-out infinite alternate; }
+.mural-bg.on { opacity: 1; }
+@keyframes mural-drift { from { transform: scale(1.02) translate(-.8%, -.6%); } to { transform: scale(1.09) translate(.8%, .6%); } }
+.mural-scrim { position: absolute; inset: 0; pointer-events: none; }
+.mural-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.2s ease; }
+.mural-canvas.on { opacity: 1; }
+.mural[data-scene="home"] .mural-scrim {
+  background: linear-gradient(to top, color-mix(in srgb, var(--m-deep) 74%, transparent), transparent 62%);
+}
+.mural[data-backdrop="games"] .mural-scrim, .mural[data-backdrop="photo"] .mural-scrim, .mural[data-backdrop="board"] .mural-scrim {
+  background:
+    linear-gradient(to top, color-mix(in srgb, var(--m-deep) 92%, transparent), color-mix(in srgb, var(--m-deep) 22%, transparent) 62%),
+    linear-gradient(to right, color-mix(in srgb, var(--m-deep) 48%, transparent), transparent 60%);
+}
+.mural[data-scene="game"] .mural-scrim {
+  background:
+    linear-gradient(to top, color-mix(in srgb, var(--m-deep) 96%, transparent), color-mix(in srgb, var(--m-deep) 28%, transparent) 58%, color-mix(in srgb, var(--m-deep) 58%, transparent)),
+    linear-gradient(to right, color-mix(in srgb, var(--m-deep) 62%, transparent), transparent 62%);
+}
+.mural[data-scene="music"] .mural-bg { filter: blur(52px) saturate(1.5) brightness(.6); inset: -12%; width: 124%; height: 124%; }
+.mural[data-scene="music"] .mural-scrim { background: color-mix(in srgb, var(--m-deep) 42%, transparent); }
+
+.mural-scene {
+  position: absolute; inset: 0; padding: var(--pad); padding-bottom: max(var(--pad), env(safe-area-inset-bottom));
+  transition: translate 2s linear;
+}
+.mural-dim { color: var(--dim); margin: 0; }
+.mural time { font-variant-numeric: tabular-nums; }
+.mural .i { width: 1em; height: 1em; }
+
+/* vidro: painéis tingidos pela paleta, com a arte aparecendo por trás */
+.mural-glass {
+  border-radius: var(--glass-r); border: 1px solid rgb(255 255 255 / .14);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--m-mid) 52%, transparent), color-mix(in srgb, var(--m-deep) 74%, transparent));
+  -webkit-backdrop-filter: blur(26px) saturate(1.5); backdrop-filter: blur(26px) saturate(1.5);
+  box-shadow: 0 18px 50px rgb(0 0 0 / .32), inset 0 1px 0 rgb(255 255 255 / .1);
+}
+.mural .btn-primary { background: var(--m-accent); color: #10140f; }
+.mural-chip {
+  display: inline-flex; align-items: center; gap: .4em; padding: .32em .8em; border-radius: 999px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--m-deep) 58%, transparent); border: 1px solid rgb(255 255 255 / .12);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+}
+.mural-chip span { font-weight: 400; color: var(--dim); }
+.mural-chip span:first-letter { text-transform: uppercase; }
+.mural-chip .i { color: var(--m-accent); }
+.mural-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: clamp(15px, 2.8vmin, 30px); }
+
+/* Início: o relógio sobre o céu da cidade */
+.mural-home { height: 100%; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--pad); align-items: end; }
+.mural-clock time {
+  display: block; font-size: clamp(96px, 34vmin, 480px); font-weight: 600; font-stretch: 66%; line-height: .84; letter-spacing: -.012em;
+  text-shadow: 0 .03em .3em rgb(0 0 0 / .28);
+}
+.mural-clock p { margin: .45em 0 0; font-size: clamp(20px, 4.2vmin, 50px); font-weight: 500; color: var(--m-accent); }
+.mural-clock p:first-letter { text-transform: uppercase; }
+.mural-clock .mural-dim { font-size: clamp(15px, 2.4vmin, 26px); margin-top: .4em; color: var(--dim); font-weight: 400; }
+.mural-side { min-width: 0; display: grid; justify-items: stretch; }
+.mural-weather { display: grid; gap: clamp(12px, 2.6vmin, 28px); padding: clamp(16px, 3.4vmin, 38px); }
+.mural-w-now { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.mural-temp { display: flex; align-items: center; gap: .16em; font-size: clamp(54px, 12.5vmin, 150px); line-height: 1; }
+.mural-temp b { font-weight: 600; font-stretch: 70%; font-variant-numeric: tabular-nums; }
+.mural-temp .i { width: .82em; height: .82em; color: var(--m-accent); }
+.mural-w-now p { margin: 0; text-align: right; font-size: clamp(14px, 2.3vmin, 24px); }
+.mural-w-now .mural-w-city { font-size: clamp(18px, 3.2vmin, 34px); font-weight: 650; }
+.mural-w-facts { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 18px; margin: 0; padding-block: clamp(10px, 2vmin, 20px); border-block: 1px solid rgb(255 255 255 / .14); }
+.mural-w-facts dt { font-size: clamp(12px, 1.9vmin, 18px); color: var(--dim); }
+.mural-w-facts dd { margin: 0; font-size: clamp(17px, 3vmin, 32px); font-weight: 600; font-stretch: 84%; font-variant-numeric: tabular-nums; }
+.mural-days { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mural-days li { display: grid; grid-template-columns: auto auto auto; justify-content: start; column-gap: .45em; align-items: center; font-size: clamp(14px, 2.3vmin, 24px); font-variant-numeric: tabular-nums; }
+.mural-days li > span:first-child { grid-column: 1 / -1; text-transform: capitalize; color: var(--dim); font-size: .86em; }
+.mural-days .i { width: 1.35em; height: 1.35em; color: var(--m-accent); }
+.mural-days .mural-dim { font-size: .86em; }
+
+/* Jogo */
+.mural-game { height: 100%; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr) auto; gap: clamp(12px, 2.6vmin, 28px); align-items: end; }
+.mural-game .mural-top { grid-column: 1 / -1; align-self: start; }
+.mural-title { grid-column: 1 / -1; align-self: end; min-width: 0; }
+.mural-title h1 { margin: 0; font-size: clamp(38px, 10vmin, 130px); font-weight: 700; font-stretch: 72%; line-height: 1; text-wrap: balance; text-shadow: 0 .04em .4em rgb(0 0 0 / .5); }
+.mural-logo { display: block; max-width: min(56vw, 700px); max-height: 28vh; object-fit: contain; object-position: left bottom; filter: drop-shadow(0 6px 26px rgb(0 0 0 / .6)); }
+.mural-title p { margin-top: .5em; font-size: clamp(15px, 2.6vmin, 28px); }
+.mural-hud { display: flex; flex-wrap: wrap; align-items: center; gap: clamp(14px, 3.4vmin, 44px); min-width: 0; padding: clamp(12px, 2.4vmin, 26px) clamp(14px, 3.2vmin, 36px); }
+.mural-fps { display: flex; align-items: center; gap: clamp(10px, 2.4vmin, 28px); flex: 1 1 280px; min-width: 0; }
+.mural-fps-num { display: grid; }
+.mural-fps-num b { font-size: clamp(54px, 13vmin, 170px); font-weight: 600; font-stretch: 68%; line-height: .9; color: var(--m-accent); font-variant-numeric: tabular-nums; }
+.mural-fps-num span { font-size: clamp(13px, 2vmin, 22px); color: var(--dim); }
+.mural-fps .spark { flex: 1; min-width: 90px; height: clamp(54px, 11vmin, 130px); margin: 0; --border: rgb(255 255 255 / .16); }
+.mural-stats { display: flex; flex-wrap: wrap; align-items: center; gap: clamp(14px, 3.2vmin, 40px); min-width: 0; }
+.mural-stat { display: grid; }
+.mural-stat b { font-size: clamp(22px, 4.6vmin, 58px); font-weight: 600; font-stretch: 74%; line-height: 1.05; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mural-stat span { font-size: clamp(13px, 2vmin, 22px); color: var(--dim); }
+.mural-ring { position: relative; display: grid; place-items: center; width: clamp(66px, 13vmin, 150px); aspect-ratio: 1; text-align: center; }
+.mural-ring svg { position: absolute; inset: 0; rotate: -90deg; }
+.mural-ring circle { fill: none; stroke: rgb(255 255 255 / .16); stroke-width: 8; }
+.mural-ring circle.on { stroke: var(--m-accent); stroke-linecap: round; transition: stroke-dasharray .6s var(--ease); }
+.mural-ring b { font-size: clamp(16px, 3.3vmin, 40px); font-weight: 600; font-stretch: 76%; line-height: 1; margin-top: .3em; font-variant-numeric: tabular-nums; }
+.mural-ring span { font-size: clamp(11px, 1.7vmin, 18px); color: var(--dim); margin-bottom: .7em; }
+.mural-player { display: flex; align-items: center; gap: 12px; align-self: stretch; max-width: min(34vw, 400px); padding: 10px 16px 10px 10px; }
+.mural-player img, .mural-noart { flex: none; width: clamp(48px, 10vmin, 96px); aspect-ratio: 1; border-radius: 10px; object-fit: cover; display: grid; place-items: center; background: color-mix(in srgb, var(--m-mid) 80%, black); }
+.mural-player div { min-width: 0; display: grid; }
+.mural-player b, .mural-player div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mural-player b { font-size: clamp(14px, 2.4vmin, 24px); }
+.mural-player div span { font-size: clamp(12px, 2vmin, 20px); color: var(--dim); }
+
+/* Música */
+.mural-music { height: 100%; display: grid; grid-template-rows: auto 1fr; gap: clamp(12px, 3vmin, 32px); }
+.mural-track { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: clamp(20px, 6vmin, 84px); align-items: center; min-height: 0; }
+.mural-art {
+  width: min(66vh, 44vw); aspect-ratio: 1; object-fit: cover; border-radius: var(--glass-r);
+  box-shadow: 0 30px 90px rgb(0 0 0 / .55), 0 0 130px -10px color-mix(in srgb, var(--m-accent) 42%, transparent);
+}
+.mural-info { min-width: 0; }
+.mural-info h1 { margin: 0; font-size: clamp(36px, 10vmin, 124px); font-weight: 700; font-stretch: 72%; line-height: 1.02; overflow-wrap: anywhere; text-wrap: balance;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.mural-artist { margin: .4em 0 0; font-size: clamp(20px, 4.2vmin, 50px); font-weight: 500; color: color-mix(in srgb, var(--m-accent) 45%, white); }
+.mural-info .mural-dim { font-size: clamp(14px, 2.5vmin, 26px); margin-top: .25em; }
+.mural-prog { height: 8px; margin-top: clamp(14px, 3.4vmin, 34px); border-radius: 4px; background: rgb(255 255 255 / .22); overflow: hidden; }
+.mural-prog i { display: block; height: 100%; border-radius: 4px; background: var(--m-accent); transition: width 1s linear; }
+.mural-btns { display: flex; gap: 10px; margin-top: 14px; max-width: 460px; opacity: 0; transition: opacity .2s; }
+.mural.awake .mural-btns { opacity: 1; }
+.mural-btns .btn { flex: 1; min-height: 52px; font-size: 22px; border-radius: 999px; background: color-mix(in srgb, var(--m-deep) 60%, transparent); border-color: rgb(255 255 255 / .24); color: #f6f8f4; }
+
+/* eventos: avisos no canto */
+.mural-toasts { position: absolute; top: var(--pad); right: var(--pad); z-index: 3; display: grid; gap: 10px; width: min(440px, calc(100vw - 2 * var(--pad))); transition: top .32s var(--ease); }
+.mural.awake .mural-toasts { top: max(var(--pad), calc(clamp(44px, 6vmin, 62px) + 40px)); }     /* desce para não ficar atrás do dock */
+.mural-toast {
+  display: flex; gap: 14px; align-items: flex-start; padding: 14px 18px; border-radius: 18px; overflow-wrap: anywhere;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--m-mid) 70%, #0a1412), color-mix(in srgb, var(--m-deep) 88%, #0a1412));
+  border: 1px solid rgb(255 255 255 / .16); box-shadow: 0 18px 50px rgb(0 0 0 / .45); animation: toast-in .32s var(--ease);
+}
+.mural-toast.warning { box-shadow: inset 4px 0 0 #ffb86b, 0 18px 50px rgb(0 0 0 / .45); }
+.mural-toast.critical { box-shadow: inset 4px 0 0 #ff7b78, 0 18px 50px rgb(0 0 0 / .45); }
+.mural-toast-ico { flex: none; display: grid; place-items: center; font-size: 26px; line-height: 1.1; color: var(--m-accent); }
+.mural-toast-ico img { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; }
+.mural-toast div { min-width: 0; }
+.mural-toast b { font-size: 18px; }
+.mural-toast p { margin: 3px 0 0; color: var(--dim); }
+.mural-toast small { display: block; margin-top: 4px; color: var(--dim); font-size: 13px; }
+@keyframes toast-in { from { translate: 24px 0; opacity: 0; } }
+
+/* eventos: tela inteira, por cima da cena, que continua atualizando por baixo */
+.mural-takeover {
+  position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; justify-items: center; text-align: center; gap: clamp(8px, 2vmin, 20px);
+  padding: var(--pad); background: color-mix(in srgb, var(--m-deep) 84%, transparent);
+  -webkit-backdrop-filter: blur(34px) saturate(1.4); backdrop-filter: blur(34px) saturate(1.4); animation: take-in .4s var(--ease);
+}
+.mural-takeover[hidden] { display: none; }
+.mural-takeover.warning { background: rgb(70 42 10 / .9); }
+.mural-takeover.critical { background: rgb(92 14 18 / .93); }
+@keyframes take-in { from { opacity: 0; scale: 1.03; } }
+.mural-take-ico { display: grid; font-size: clamp(64px, 18vmin, 200px); line-height: 1; color: var(--m-accent); }
+.mural-takeover.warning .mural-take-ico { color: #ffc98a; }
+.mural-takeover.critical .mural-take-ico { color: #ffd1cf; }
+.mural-take-art { width: auto; max-width: 70vw; height: min(50vh, 62vw); object-fit: cover; aspect-ratio: 2 / 3; border-radius: var(--glass-r); box-shadow: 0 26px 80px rgb(0 0 0 / .6); }
+.mural-take-kicker { margin: 0; font-size: clamp(16px, 3vmin, 32px); color: var(--m-accent); }
+.mural-takeover h2 { margin: 0; max-width: 18ch; font-size: clamp(38px, 11vmin, 140px); font-weight: 700; font-stretch: 72%; line-height: 1.02; text-wrap: balance; overflow-wrap: anywhere; }
+.mural-take-text { margin: 0; max-width: 46ch; font-size: clamp(17px, 3.4vmin, 38px); color: #f1f4f0; overflow-wrap: anywhere; }
+.mural-take-src { margin: 0; font-size: clamp(14px, 2.2vmin, 24px); color: var(--dim); }
+.mural-takeover .btn { margin-top: 10px; min-height: 48px; border-radius: 999px; background: rgb(255 255 255 / .12); border-color: rgb(255 255 255 / .3); color: #fff; }
+.mural-take-time { position: absolute; left: 0; bottom: 0; width: 100%; height: 5px; background: rgb(255 255 255 / .75); transform-origin: left; animation: take-time linear forwards; }
+@keyframes take-time { to { transform: scaleX(0); } }
+
+/* controles: aparecem ao mexer o mouse ou tocar */
+.mural-bar {
+  --dock-h: clamp(44px, 6vmin, 62px);
+  position: absolute; left: 50%; top: max(14px, env(safe-area-inset-top)); z-index: 6; translate: -50% -10px;
+  display: flex; align-items: center; gap: 6px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 999px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--m-mid) 50%, transparent), color-mix(in srgb, var(--m-deep) 72%, transparent));
+  -webkit-backdrop-filter: blur(28px) saturate(1.7); backdrop-filter: blur(28px) saturate(1.7);
+  border: 1px solid rgb(255 255 255 / .16); box-shadow: 0 16px 44px rgb(0 0 0 / .4), inset 0 1px 0 rgb(255 255 255 / .14);
+  opacity: 0; pointer-events: none; transition: opacity .2s, translate .32s var(--ease);
+}
+.mural.awake .mural-bar { opacity: 1; pointer-events: auto; translate: -50% 0; }
+.mural-dock-modes { position: relative; display: flex; }
+.mural-dock-pill {
+  position: absolute; left: 0; top: 0; height: var(--dock-h); border-radius: 999px; background: var(--m-accent);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--m-accent) 50%, transparent); transition: translate .34s var(--ease), width .34s var(--ease);
+}
+.mural-bar button {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: .45em; height: var(--dock-h); min-width: var(--dock-h); padding: 0 clamp(12px, 2vmin, 22px);
+  border: 0; border-radius: 999px; background: none; color: #f6f8f4; font: 550 clamp(14px, 2vmin, 19px) var(--font); font-stretch: 90%; cursor: pointer; transition: color .2s, background .2s;
+}
+.mural-bar button .i { width: 1.25em; height: 1.25em; }
+.mural-bar button[aria-pressed="true"] { color: #10140f; }
+.mural-bar button[aria-pressed="false"]:hover, .mural-dock-tools button:hover { background: rgb(255 255 255 / .1); }
+.mural-bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.mural-dock-tools { display: flex; gap: 2px; padding-left: 6px; border-left: 1px solid rgb(255 255 255 / .16); }
+.mural-dock-tools button { padding: 0; }
+.mural-bar button[hidden] { display: none; }
+.mural.awake .mural-top [data-date] { visibility: hidden; }   /* a barra ocupa esse espaço enquanto está visível */
+
+@media (orientation: portrait), (max-width: 640px) {
+  .mural-home { grid-template-columns: 1fr; align-content: end; }
+  .mural-track { grid-template-columns: 1fr; justify-items: center; text-align: center; align-content: center; }
+  .mural-art { width: min(74vw, 46vh); }
+  .mural-info { width: 100%; }
+  .mural-btns { margin-inline: auto; }
+  .mural-game { grid-template-columns: 1fr; }
+  .mural-player { max-width: 100%; }
+  .mural-logo { max-width: 80vw; }
+  .mural-bar button[aria-pressed="false"] span { display: none; }      /* no celular, só o modo atual mostra o nome */
+  .mural-bar button { padding: 0 11px; }
+  .mural-dock-tools button { padding: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mural-bg { animation: none; }
+  .mural-bar, .mural-dock-pill { transition: none; }
+}
+
+/* ---------- aba Mural (configurações) ---------- */
+.mural-open-card .btn-primary { margin-top: 12px; }
+.mural-toggles { display: grid; gap: 10px; }
+.mural-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px 16px; }
+.mural-city-now { margin: 0 0 6px; }
+.mural-city-q { width: 100%; margin-top: 4px; }
+.city-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.city-list .btn { width: 100%; justify-content: flex-start; font-weight: 400; text-align: left; padding-block: 6px; height: auto; flex-wrap: wrap; }
+.not-game-list { list-style: none; margin: 4px 0 12px; padding: 0; display: grid; gap: 6px; }
+.not-game { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.not-game span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.not-game .btn { flex: none; }
+.bg-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.bg-tile { display: grid; gap: 6px; padding: 0 0 8px; border: 2px solid var(--border); border-radius: var(--r-m); background: var(--surface-2); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.bg-tile:hover { border-color: var(--text-muted); }
+.bg-tile[aria-pressed="true"] { border-color: var(--accent); font-weight: 650; }
+.bg-tile canvas, .bg-art { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: var(--track); color: var(--text-secondary); font-size: 26px; }
+.bg-art img { width: 100%; height: 100%; object-fit: cover; }
+.bg-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.bg-tools .note { flex-basis: 100%; margin-top: 2px; }
+.cover-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.cover-tile { position: relative; display: grid; gap: 6px; padding: 0 0 8px; border: 1px solid var(--border); border-radius: var(--r-m); background: var(--surface-2); color: var(--text-primary); cursor: pointer; overflow: hidden; text-align: left; }
+.cover-tile:hover { border-color: var(--accent); }
+.cover-tile img, .cover-empty { display: grid; place-items: center; width: 100%; aspect-ratio: 460 / 215; object-fit: cover; background: var(--track); color: var(--text-secondary); font-size: 28px; font-weight: 700; }
+.cover-name { padding: 0 8px; font-size: 13px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cover-tile .chip { position: absolute; top: 6px; left: 6px; }
+.art-choices { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-top: 12px; }
+.art-choice { display: grid; gap: 4px; padding: 4px; border: 2px solid var(--border); border-radius: var(--r-m); background: none; color: var(--text-primary); font-size: 13px; text-align: center; cursor: pointer; }
+.art-choice[aria-pressed="true"] { border-color: var(--accent); }
+.art-choice img { width: 100%; height: 110px; object-fit: cover; border-radius: var(--r-s); background: var(--track); }
+.art-choice:disabled { display: none; }
+.art-upload { width: 100%; margin-top: 12px; }
+.webhook-token { margin: 8px 0; padding: 10px 12px; border-radius: var(--r-s); background: var(--surface-2); font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; user-select: all; }
+.webhook-doc { margin: 8px 0 0; padding: 10px 12px; border-radius: var(--r-s); background: var(--surface-2); font: 12.5px/1.55 var(--mono); overflow-x: auto; }
+.webhook-fields { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--text-secondary); }
+.webhook-fields li + li { margin-top: 3px; }
+.note-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.al-icon { display: inline-grid; vertical-align: -.1em; margin-right: 4px; }
+.al-source { display: block; font-size: 12.5px; }

@@ -32,6 +32,9 @@ MANGO_CONF = HOME / ".config" / "MangoHud" / "MangoHud.conf"
 BEGIN, END = "# >>> self-monitoring: leitura de FPS no painel", "# <<< self-monitoring"
 ACTIVE_WINDOW = 5.0     # s sem escrever no CSV = jogo fechado/log parado
 WINDOW_1PCT = 60.0      # s usados para o 1% low
+MAX_NOT_GAMES = 200
+MAX_RECENT = 8          # jogos vistos há pouco, para escolher o que não é jogo
+RX_KEY = re.compile(r"(steam:\d{1,12}|exe:[a-z0-9._-]{1,80})")
 
 
 def read_mango_conf() -> tuple[str, dict]:
@@ -85,7 +88,11 @@ class GameMonitor:
     def __init__(self, ctx) -> None:
         self.ctx = ctx
         self.lock = threading.Lock()
-        self.enabled = self._load()
+        state = self._load()
+        self.enabled = bool(state.get("fps_enabled"))
+        saved = state.get("not_games")
+        self.not_games: dict[str, str] = {str(k): str(v) for k, v in saved.items()} if isinstance(saved, dict) else {}
+        self.recent: dict[str, str] = {}
         self.file: Path | None = None
         self.pos = 0
         self.header: list[str] | None = None
@@ -94,11 +101,30 @@ class GameMonitor:
         self.last_write = 0.0
 
     # ---------- ligar/desligar ----------
-    def _load(self) -> bool:
+    def _load(self) -> dict:
         try:
-            return bool(json.loads(STATE_FILE.read_text()).get("fps_enabled"))
+            state = json.loads(STATE_FILE.read_text())
         except (OSError, ValueError):
-            return False
+            return {}
+        return state if isinstance(state, dict) else {}
+
+    def _save(self) -> None:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        STATE_FILE.write_text(json.dumps({"fps_enabled": self.enabled, "not_games": self.not_games}))
+
+    def set_not_game(self, key: str, name: str | None, ignored: bool) -> dict:
+        """Marca (ou desmarca) um app como "não é jogo": ele some do jogo atual e do FPS."""
+        if not valid_key(key):
+            raise ValueError("Jogo inválido.")
+        with self.lock:
+            if not ignored:
+                self.not_games.pop(key, None)
+            elif key in self.not_games or len(self.not_games) < MAX_NOT_GAMES:
+                self.not_games[key] = str(name or key.split(":", 1)[1])[:80]
+            else:
+                raise ValueError("A lista de apps que não são jogos está cheia.")
+            self._save()
+        return self.status()
 
     def set_enabled(self, on: bool) -> dict:
         text, opts = read_mango_conf()
@@ -122,8 +148,7 @@ class GameMonitor:
         except OSError as e:
             raise RuntimeError(f"Não foi possível alterar {MANGO_CONF}: {e}") from None
         self.enabled = on
-        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        STATE_FILE.write_text(json.dumps({"fps_enabled": on}))
+        self._save()
         log.info("leitura de FPS %s", "ativada" if on else "desativada")
         return self.status()
 
@@ -140,7 +165,7 @@ class GameMonitor:
             if m and m.group(1) != "0":
                 appid = m.group(1)
                 return {"appid": appid, "name": steam_name(appid) or f"App {appid}", "since": p.get("create_time"),
-                        "source": "steam"}
+                        "source": "steam", "pid": p.get("pid")}
         return None
 
     # ---------- leitura do CSV ----------
@@ -220,7 +245,20 @@ class GameMonitor:
         if fname:
             name = re.sub(r"_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.csv$", "", fname)
         if game is None and live and name:
-            game = {"appid": None, "name": name, "since": None, "source": "mangohud"}
+            # o CSV do MangoHud tem o nome do executável: serve de chave estável para o jogo sem Steam
+            game = {"appid": None, "name": name, "since": None, "source": "mangohud", "exe": name}
+        with self.lock:
+            if game:
+                game = {**game, "key": game_key(game)}
+                if game["key"] in self.not_games:      # marcado como "não é jogo": some do jogo atual e do FPS
+                    game, live = None, False
+                else:
+                    self.recent.pop(game["key"], None)
+                    self.recent[game["key"]] = game["name"]
+                    while len(self.recent) > MAX_RECENT:
+                        self.recent.pop(next(iter(self.recent)))
+            not_games = [{"key": k, "name": n} for k, n in self.not_games.items()]
+            seen = [{"key": k, "name": n} for k, n in reversed(self.recent.items()) if k not in self.not_games]
         return {
             "enabled": self.enabled, "config_ok": self.config_ok() if self.enabled else None,
             "conf_path": str(MANGO_CONF), "log_folder": str(log_folder()),
@@ -228,8 +266,19 @@ class GameMonitor:
             "fps": fps if live else None, "low1": low if live else None,
             "frametime": round(last["frametime"], 2) if live and last.get("frametime") else None,
             "cpu_load": last.get("cpu_load") if live else None, "gpu_load": last.get("gpu_load") if live else None,
-            "log_file": fname,
+            "log_file": fname, "not_games": not_games, "recent_games": seen,
         }
+
+
+def valid_key(key: str) -> bool:
+    return bool(RX_KEY.fullmatch(key or ""))
+
+
+def game_key(game: dict) -> str:
+    """Identifica o jogo nas preferências do Mural (arte escolhida) e na lista de "não é jogo"."""
+    if game.get("appid"):
+        return f"steam:{game['appid']}"
+    return "exe:" + (re.sub(r"[^a-z0-9._-]+", "-", (game.get("exe") or game.get("name") or "?").lower()).strip("-")[:80] or "x")
 
 
 _names: dict[str, str | None] = {}
@@ -253,6 +302,25 @@ def steam_name(appid: str) -> str | None:
             break
     _names[appid] = name
     return name
+
+
+NOT_GAME_NAMES = re.compile(r"redistributable|steamworks|proton |steam linux runtime|^steamvr$", re.I)
+
+
+def steam_games() -> list[tuple[str, str]]:
+    """(appid, nome) dos jogos instalados, em todas as bibliotecas da Steam."""
+    out: dict[str, str] = {}
+    for root in STEAM_ROOTS:
+        for lib in _libraries(root):
+            for acf in (lib / "steamapps").glob("appmanifest_*.acf"):
+                appid = acf.stem.split("_", 1)[1]
+                try:
+                    m = re.search(r'"name"\s+"([^"]+)"', acf.read_text(encoding="utf-8", errors="replace"))
+                except OSError:
+                    continue
+                if m and not NOT_GAME_NAMES.search(m.group(1)):
+                    out[appid] = m.group(1)
+    return list(out.items())
 
 
 def _libraries(root: Path) -> list[Path]:

@@ -151,7 +151,7 @@ export function suspiciousView(app, el) {
         ${it.exe ? `<div class="mono muted susp-exe">${esc(it.exe)}</div>` : ""}
         ${flagList(fl)}
       </article>`;
-    }).join("") : `<div class="card empty">Nenhum processo com sinais de atenção. 👍</div>`;
+    }).join("") : `<div class="card empty">Nenhum processo com sinais de atenção.</div>`;
     $("[data-trusted]", el).innerHTML = data.trusted.length
       ? `<ul class="top-list">${data.trusted.map(t => `<li><span class="name mono">${esc(t)}</span><button class="btn btn-sm" data-untrust="${esc(t)}">Remover</button></li>`).join("")}</ul>`
       : `<p class="muted">Nenhum. Use "Marcar como confiável" na análise de um processo para escondê-lo desta lista.</p>`;

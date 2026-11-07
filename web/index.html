@@ -3,14 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#121211">
+<meta name="theme-color" content="#0d1f1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Self Monitoring</title>
 <link rel="icon" href="/icon.svg">
 <link rel="manifest" href="/manifest.webmanifest">
+<link rel="preload" href="/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/css/mural.css">
+<script src="/js/theme-boot.js"></script>
 </head>
 <body>
+  <a class="skip" href="#views">Ir para o conteúdo</a>
   <header class="topbar">
     <div class="brand">
       <img src="/icon.svg" alt="" width="28" height="28">
@@ -21,13 +26,13 @@
     </div>
     <nav class="tabs" id="tabs" aria-label="Seções"></nav>
     <div class="top-actions">
-      <a class="icon-btn bell" href="#alerts" id="bell" title="Alertas" aria-label="Alertas" hidden>🔔<span class="badge" hidden></span></a>
+      <a class="icon-btn bell" href="#alerts" id="bell" title="Alertas" aria-label="Alertas" hidden><span class="bell-ico"></span><span class="badge" hidden></span></a>
       <span class="live" id="live" title="Conexão"><span class="dot"></span><span class="live-label">Conectando</span><span class="live-ago"></span></span>
-      <button class="icon-btn" id="theme-btn" title="Alternar tema" aria-label="Alternar tema">◐</button>
+      <button class="icon-btn" id="theme-btn" title="Aparência" aria-label="Aparência"></button>
     </div>
   </header>
 
-  <main id="views"></main>
+  <main id="views" tabindex="-1"></main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog class="sheet" id="sheet"></dialog>

@@ -3,7 +3,7 @@
   "short_name": "Monitor",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#121211",
-  "theme_color": "#121211",
+  "background_color": "#0d1f1a",
+  "theme_color": "#0d1f1a",
   "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

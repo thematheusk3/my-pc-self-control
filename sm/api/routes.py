@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .. import __version__
 from ..actions import ActionError, signal_process
+from ..webhook import WebhookError
 from . import Response, route
 
 
@@ -367,6 +368,17 @@ def game_set(req):
         return Response({"error": str(e)}, 500)
 
 
+@route("POST", "/api/game/not-game")
+def game_not_game(req):
+    if not req.ctx.game:
+        return Response({"error": "indisponível"}, 404)
+    b = req.json() or {}
+    try:
+        return req.ctx.game.set_not_game(b.get("key"), b.get("name"), b.get("ignored", True) is not False)
+    except ValueError as e:
+        return Response({"error": str(e)}, 400)
+
+
 # ---------- áudio ----------
 def _control_off(req):
     return None if req.ctx.config.allow_control else Response(
@@ -492,6 +504,129 @@ def power_timer_set(req):
 @route("GET", "/api/updates")
 def updates_status(req):
     return req.ctx.updates.status() if req.ctx.updates else Response({"error": "indisponível"}, 404)
+
+
+@route("GET", "/api/mural")
+def mural_get(req):
+    return req.ctx.mural.status()
+
+
+@route("POST", "/api/mural")
+def mural_set(req):
+    try:
+        return req.ctx.mural.update(req.json() or {})
+    except ValueError as e:
+        return Response({"error": str(e)}, 400)
+
+
+@route("GET", "/api/mural/cities")
+def mural_cities(req):
+    try:
+        return {"cities": req.ctx.mural.search_city(req.query.get("q", [""])[0])}
+    except (OSError, ValueError):
+        return Response({"error": "Não foi possível buscar a cidade. Verifique a internet do PC."}, 502)
+
+
+@route("GET", "/api/mural/games")
+def mural_games(req):
+    return {"games": req.ctx.mural.games((req.ctx.data.get("game") or {}).get("game"))}
+
+
+@route("GET", "/api/mural/art/<key>")
+def mural_art_get(req, key):
+    kind = req.query.get("kind", [None])[0]
+    res = req.ctx.mural.art(key, kind)
+    if not res:
+        return Response({"error": "sem arte"}, 404)
+    # sem "kind" é a arte escolhida, que o usuário pode trocar: não fica em cache
+    return Response(res[0], 200, {"Content-Type": res[1], **({"Cache-Control": "private, max-age=86400"} if kind else {})})
+
+
+@route("POST", "/api/mural/art/<key>")
+def mural_art_set(req, key):
+    b = req.json() or {}
+    try:
+        return req.ctx.mural.set_art(key, b.get("name"), b.get("kind"), b.get("image"))
+    except ValueError as e:
+        return Response({"error": str(e)}, 400)
+
+
+@route("POST", "/api/mural/art/<key>/reset")
+def mural_art_reset(req, key):
+    try:
+        req.ctx.mural.reset_art(key)
+    except ValueError as e:
+        return Response({"error": str(e)}, 400)
+    return {"ok": True}
+
+
+@route("GET", "/api/mural/background")
+def mural_background_get(req):
+    data = req.ctx.mural.background()
+    if data is None:
+        return Response({"error": "sem imagem"}, 404)
+    return Response(data, 200, {"Content-Type": "image/jpeg"})
+
+
+@route("POST", "/api/mural/background")
+def mural_background_set(req):
+    try:
+        return req.ctx.mural.set_background((req.json() or {}).get("image") or "")
+    except ValueError as e:
+        return Response({"error": str(e)}, 400)
+
+
+@route("POST", "/api/mural/background/reset")
+def mural_background_reset(req):
+    return req.ctx.mural.reset_background()
+
+
+@route("POST", "/api/webhook/notify")
+def webhook_notify(req):
+    """Sem sessão: autorizado pelo token (ver sm/webhook.py)."""
+    hook = req.ctx.webhook
+    if not hook:
+        return Response({"error": "indisponível"}, 404)
+    try:
+        hook.authorize(req.headers.get("Authorization"), req.client_address[0])
+        return hook.receive(req.json())
+    except WebhookError as e:
+        return Response({"error": str(e)}, e.status, {"Retry-After": str(e.retry)} if e.retry else None)
+
+
+@route("GET", "/api/webhook")
+def webhook_status(req):
+    return req.ctx.webhook.status() if req.ctx.webhook else Response({"error": "indisponível"}, 404)
+
+
+@route("POST", "/api/webhook/token")
+def webhook_token(req):
+    return {"token": req.ctx.webhook.new_token(), **req.ctx.webhook.status()}
+
+
+@route("POST", "/api/webhook/revoke")
+def webhook_revoke(req):
+    req.ctx.webhook.revoke()
+    return req.ctx.webhook.status()
+
+
+@route("POST", "/api/webhook/test")
+def webhook_test(req):
+    return req.ctx.webhook.receive({"title": "Teste do webhook", "message": "As notificações por webhook estão funcionando.",
+                                    "icon": "check", "source": "Painel"})
+
+
+@route("GET", "/api/panel-update")
+def panel_update(req):
+    return req.ctx.selfupdate.status() if req.ctx.selfupdate else Response({"error": "indisponível"}, 404)
+
+
+@route("POST", "/api/panel-update/check")
+def panel_update_check(req):
+    if not req.ctx.selfupdate:
+        return Response({"error": "indisponível"}, 404)
+    req.ctx.selfupdate.check_now()
+    return req.ctx.selfupdate.status()
 
 
 @route("POST", "/api/updates/refresh")

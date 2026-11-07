@@ -1,10 +1,11 @@
 // Aba Controles: Áudio (mídia tocando, saída, volume, por app, microfone), Tela (resolução, brilho, desligar) e Captura de tela.
+import { ic } from "../icons.js";
 import { $, bytes, esc, toast } from "../ui.js";
 import { STATUS, artSrc, controlMedia, livePos, mediaButtons, mmss } from "../media.js";
 
 let app, root, view = "audio", timer = null, busy = false;
 let audio = null, disp = null, ddc = null, shots = null;
-const ICON = { hdmi: "🖥", headset: "🎧", bluetooth: "🎧", usb: "🔌", speaker: "🔊" };
+const ICON = { hdmi: ic("monitor"), headset: ic("headphones"), bluetooth: ic("headphones"), usb: ic("usb"), speaker: ic("speaker-high") };
 
 function mount(el, a) {
   app = a; root = el;
@@ -124,7 +125,7 @@ function renderMedia(m, ts) {
 
 // ---------- áudio ----------
 const slider = (attrs, v) => `<span class="vol"><input type="range" min="0" max="150" step="1" value="${v ?? 0}" ${attrs}><output>${v ?? "—"}%</output></span>`;
-const muteBtn = (attrs, m, onIco = "🔇", offIco = "🔊") => `<button class="btn btn-sm mute ${m ? "on" : ""}" ${attrs} aria-pressed="${m}" title="${m ? "Ativar som" : "Mudo"}">${m ? onIco : offIco}</button>`;
+const muteBtn = (attrs, m, onIco = ic("speaker-slash"), offIco = ic("speaker-high")) => `<button class="btn btn-sm mute ${m ? "on" : ""}" ${attrs} aria-pressed="${m}" title="${m ? "Ativar som" : "Mudo"}" aria-label="${m ? "Ativar som" : "Mudo"}">${m ? onIco : offIco}</button>`;
 
 function renderAudio() {
   const a = audio;
@@ -136,14 +137,14 @@ function renderAudio() {
       <div class="card-head"><div class="card-title">Saída de som</div></div>
       <div class="dev-list">${a.sinks.map(s => `<div class="dev ${s.default ? "default" : ""}">
           <button class="dev-pick" data-op="set_default" data-kind="sink" data-name="${esc(s.name)}" aria-pressed="${s.default}" title="Usar esta saída">
-            <span class="dev-ico">${ICON[s.kind] || "🔊"}</span><span class="dev-name">${esc(short(s.description))}${s.default ? ` <span class="chip good">em uso</span>` : ""}</span></button>
+            <span class="dev-ico">${ICON[s.kind] || ICON.speaker}</span><span class="dev-name">${esc(short(s.description))}${s.default ? ` <span class="chip good">em uso</span>` : ""}</span></button>
           <div class="dev-ctl">${muteBtn(`data-op="mute" data-kind="sink" data-name="${esc(s.name)}" data-mute="${!s.mute}"`, s.mute)}
             ${slider(`data-op="volume" data-kind="sink" data-name="${esc(s.name)}"`, s.volume)}</div></div>`).join("") || `<p class="muted">Nenhuma saída de áudio.</p>`}</div>
       <p class="note">Tocar numa saída faz dela a padrão e leva para ela os apps que estão tocando.</p>
     </article>
     <article class="card">
       <div class="card-head"><div class="card-title">Microfone</div>${mic ? `<span class="chip ${mic.mute ? "critical" : "good"}">${mic.mute ? "Mudo" : "Ligado"}</span>` : ""}</div>
-      ${mic ? `<button class="btn mic-big ${mic.mute ? "btn-danger" : ""}" data-op="mute" data-kind="source" data-name="${esc(mic.name)}" data-mute="${!mic.mute}">${mic.mute ? "🎙 Microfone mudo · tocar para ligar" : "🎙 Mutar microfone"}</button>
+      ${mic ? `<button class="btn mic-big ${mic.mute ? "btn-danger" : ""}" data-op="mute" data-kind="source" data-name="${esc(mic.name)}" data-mute="${!mic.mute}">${ic(mic.mute ? "microphone-slash" : "microphone")} ${mic.mute ? "Microfone mudo · tocar para ligar" : "Mutar microfone"}</button>
         <div class="dev-ctl" style="margin-top:10px">${slider(`data-op="volume" data-kind="source" data-name="${esc(mic.name)}"`, mic.volume)}</div>
         ${a.sources.length > 1 ? `<select class="search" style="margin-top:10px;width:100%" data-op="set_default" data-kind="source">${a.sources.map(s => `<option value="${esc(s.name)}" ${s.default ? "selected" : ""}>${esc(short(s.description))}</option>`).join("")}</select>` : ""}
         ${a.recording.length ? `<p class="note">Usando o microfone agora: <b>${esc(a.recording.map(r => r.app).join(", "))}</b></p>` : `<p class="note">Nenhum app usando o microfone agora.</p>`}`
@@ -224,8 +225,8 @@ function renderDisplay() {
       <div class="ddc-row"><span>Brilho</span><span class="vol"><input type="range" min="0" max="${m.brightness_max || 100}" value="${m.brightness ?? 0}" data-ddc="brightness" data-bus="${m.bus}"><output>${m.brightness ?? "—"}%</output></span></div>
       <div class="ddc-row"><span>Contraste</span><span class="vol"><input type="range" min="0" max="${m.contrast_max || 100}" value="${m.contrast ?? 0}" data-ddc="contrast" data-bus="${m.bus}"><output>${m.contrast ?? "—"}%</output></span></div>
       <div class="power-btns" style="margin-top:8px">
-        <button class="btn" data-act="dim" data-bus="${m.bus}" ${m.dimmed ? "disabled" : ""}>🌑 Apagar tela</button>
-        <button class="btn" data-act="restore" data-bus="${m.bus}" ${m.dimmed ? "" : "disabled"}>☀ Restaurar</button>
+        <button class="btn" data-act="dim" data-bus="${m.bus}" ${m.dimmed ? "disabled" : ""}>${ic("moon")} Apagar tela</button>
+        <button class="btn" data-act="restore" data-bus="${m.bus}" ${m.dimmed ? "" : "disabled"}>${ic("sun")} Restaurar</button>
       </div></div>`).join("");
 
   $("[data-body]", root).innerHTML = `
@@ -239,8 +240,8 @@ function renderDisplay() {
       </article>
       <article class="card">
         <div class="card-head"><div class="card-title">Desligar a tela (espera)</div></div>
-        <button class="btn" style="width:100%" data-act="dpms-off">⏾ Pôr o monitor em espera</button>
-        <p class="note">Usa o modo de espera do monitor (DPMS); qualquer tecla ou mouse no PC acorda. ⚠ Alguns monitores em DisplayPort "somem" do sistema em espera, como quando você desliga pelo botão. Se acontecer com o seu, prefira <b>Apagar tela</b>.</p>
+        <button class="btn" style="width:100%" data-act="dpms-off">${ic("moon-stars")} Pôr o monitor em espera</button>
+        <p class="note">Usa o modo de espera do monitor (DPMS); qualquer tecla ou mouse no PC acorda. ${ic("warning")} Alguns monitores em DisplayPort "somem" do sistema em espera, como quando você desliga pelo botão. Se acontecer com o seu, prefira <b>Apagar tela</b>.</p>
       </article>
     </div>`;
 }
@@ -288,7 +289,7 @@ function renderShots() {
   $("[data-body]", root).innerHTML = `
     <article class="card">
       <div class="card-head"><div class="card-title">Captura de tela</div></div>
-      <button class="btn btn-primary" style="width:100%" data-act-shot="take">📸 Capturar a tela agora</button>
+      <button class="btn btn-primary" style="width:100%" data-act-shot="take">${ic("camera")} Capturar a tela agora</button>
       <p class="note">Toda captura mostra antes um aviso visível na tela do PC. Se o aviso não puder aparecer, a captura não é feita. As últimas 30 ficam guardadas no PC.</p>
     </article>
     <div class="shots">${(shots || []).map(s => `<figure class="card shot">
@@ -337,7 +338,7 @@ function openShot(s) {
 }
 
 export default {
-  id: "controls", title: "Controles", icon: "🎚", mount, route,
+  id: "controls", title: "Controles", icon: ic("sliders-horizontal"), mount, route,
   enabled: a => !!(a.info?.features?.control || a.info?.features?.screenshot),
   show: start, hide: stop,
 };

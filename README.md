@@ -34,6 +34,12 @@ O projeto é feito e testado no **[CachyOS](https://cachyos.org) com KDE Plasma 
   apagar/espera) e captura de tela (sempre com aviso no PC).
 - **Alertas**: regras configuráveis com aviso no painel, na tela do PC e no celular (ntfy).
 - **Jogo/FPS** (na Visão geral): jogo aberto e FPS via MangoHud.
+- **Mural**: tela cheia para deixar aberta num monitor, tablet ou celular: relógio, clima, jogo (arte, FPS, CPU, GPU) e música,
+  com seis fundos para o Início.
+- **Aparência**: três estilos (Placa, Vidro, Osciloscópio) e seis cores de placa, cada uma no tema escuro e no claro, salvos em
+  cada aparelho (botão ◐ na barra lateral).
+- **Webhook**: outros programas (scripts, backup, Home Assistant...) enviam notificações para o painel.
+- **Atualização do painel**: versão instalada × GitHub, changelog e aviso "Nova" na navegação.
 - **No PC agora** (na Visão geral): janela em foco e o que está tocando (Spotify, navegador, VLC...), com tocar/pausar/pular.
 - **Downloads Steam** (na Visão geral, só quando há algo baixando): progresso, velocidade e tempo restante.
 - **Apps**: abre pelo celular, na tela do PC, os aplicativos e jogos instalados.
@@ -188,6 +194,64 @@ uso de CPU/GPU. O jogo precisa rodar com o MangoHud (Steam: `mangohud %command%`
 Desligado, nada é lido nem gravado. Jogos da Steam abertos aparecem mesmo sem MangoHud (sem FPS).
 Se o Goverlay regravar o MangoHud.conf, desligue e ligue de novo.
 
+Se um app que não é jogo aparecer como jogo (ex.: Wallpaper Engine pela Steam, ou um programa aberto com o MangoHud), marque-o
+em **Mural > Apps que não são jogos**: ele some do jogo atual e do FPS. A lista fica em `data/game.json`.
+
+## Mural
+
+Uma tela cheia para deixar aberta num monitor, tablet ou celular. Abra pela aba *Mural* ou direto em `/#mural:abrir`. Mexa o
+mouse ou toque na tela para trocar o modo, entrar em tela cheia ou sair (também com Esc).
+
+| Modo | O que mostra |
+|---|---|
+| Automático | Jogo aberto; senão, música tocando; senão, Início. |
+| Início | Relógio, data, clima e previsão de 3 dias. |
+| Jogo | Arte do jogo de fundo, logo e os itens escolhidos: FPS, 1% low, frametime, CPU, GPU, temperaturas, VRAM, RAM, tempo de jogo e player. |
+| Música | Capa de fundo, faixa, artista, álbum, progresso, controles, hora e temperatura. |
+
+- **Clima:** escolha a cidade na aba. A previsão vem da [Open-Meteo](https://open-meteo.com/), sem cadastro; só as coordenadas
+  da cidade saem do PC, e nada é consultado antes da escolha.
+- **Fundos do Início:** Céu da cidade, Serra, Placa de circuito, Aurora, Capas dos jogos (arte da Steam, trocada a cada 2 min)
+  e Sua imagem. Escolha em Mural > Fundo do Início ou pelo botão de imagem na barra do Mural.
+- **Capas:** cada jogo usa a arte do cache da Steam (`~/.local/share/Steam/appcache/librarycache`, ou a Steam em Flatpak; se
+  faltar, a CDN dela) ou uma imagem sua, reduzida no navegador antes do envio.
+- **FPS** depende da leitura com o MangoHud (ver [FPS dos jogos](#fps-dos-jogos)).
+- **Cores:** vêm da arte do jogo ou da capa da música; no Início, do céu da cidade na hora atual.
+- **Eventos:** avisos passam no canto; alertas críticos ocupam a tela inteira e devolvem a cena anterior. Maior prioridade passa
+  na frente, e os demais esperam na fila. As opções ficam na aba Mural.
+- **Tela apagando:** impedir a tela de apagar exige HTTPS ou localhost. Pelo IP da rede, ajuste o tempo de tela no próprio aparelho.
+- **Tela cheia:** o iPhone não oferece tela cheia para páginas. Adicione o painel à Tela de Início para abrir sem as barras do Safari.
+
+## Notificações por webhook
+
+Outros programas avisam pelo painel. Gere o token na aba *Alertas*: ele aparece uma vez, e o painel guarda só o hash. Sem
+token, o webhook fica desligado.
+
+```bash
+curl -X POST http://SEU-PC:8765/api/webhook/notify \
+  -H "Authorization: Bearer SEU_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Backup concluído", "message": "120 GB copiados.", "icon": "check", "level": "info", "source": "Backup"}'
+```
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `title` | texto, obrigatório | Até 120 caracteres. |
+| `message` | texto | Até 1000 caracteres. |
+| `icon` | texto | Um emoji ou nome de ícone (a lista completa está na aba Alertas). Sem ele, usa o sino. |
+| `level` | texto | `info` (padrão), `warning` ou `critical`. |
+| `source` | texto | Nome do programa que enviou, até 60 caracteres. |
+| `url` | texto | Link `http(s)` aberto a partir do alerta. |
+| `display` | texto | Como aparece no Mural: `auto` (padrão; `critical` ocupa a tela), `toast` ou `fullscreen`. |
+| `duration` | número | Segundos no Mural, de 3 a 300. Padrão: info 5, warning 8, critical 12, tela inteira 20. |
+| `silent` | booleano | `true`: só no painel e no Mural, sem tela do PC nem ntfy. |
+
+Respostas: `200` com `{"ok": true, "id": 12}`; `400` campo inválido (com `error`); `401` token errado; `403` webhook desligado;
+`429` limite excedido, com `Retry-After`. Limites: 60 notificações por minuto e 5 tokens errados por IP a cada minuto.
+
+O token dá acesso só a esta rota, não ao resto do painel. O painel usa HTTP: na rede local o token viaja sem criptografia, então
+não exponha a porta na internet; use uma VPN.
+
 ## Áudio e tela
 
 **Áudio** (via `pactl`, PipeWire ou PulseAudio): saída padrão (tocar numa saída leva os apps junto),
@@ -248,6 +312,16 @@ pois no ntfy.sh público quem souber o nome lê as mensagens). Há um botão de 
 (mesa, systemd, gerenciador de login...) aparecem destacados. Avisa quando o PC **precisa reiniciar** (kernel novo
 instalado e o antigo ainda rodando; `/run/reboot-required` no Debian/Ubuntu; `needs-restarting -r` no Fedora).
 **O painel não instala atualizações**.
+
+### Atualização do painel
+
+A aba *Atualização* compara a versão instalada com a do GitHub e mostra o changelog, o link do repositório e o comando para
+atualizar (`atualizar.sh`). Quando há versão maior, a navegação mostra **Nova**. O aviso depende do número da versão: um commit
+que não aumenta `__version__` não gera aviso.
+
+O painel só lê dois arquivos públicos do repositório (`raw.githubusercontent.com`), com ele aberto e no máximo a cada 6 h. Não
+envia dados do PC, não baixa nem instala nada. Para desligar: `check = false` em `[update]` no `config.toml`. A aba continua
+mostrando o changelog da versão instalada.
 
 ## Desligar / reiniciar
 
@@ -340,8 +414,8 @@ tools/simular-suspeito.sh processos inofensivos que imitam malware (para testar 
     gpu.py                backends de GPU: AmdGpu, NvidiaGpu, IntelGpu
     drm_clients.py        uso de GPU por processo (fdinfo)
     quirks.py             correções por placa (BC-250 etc.)
-web/
-  index.html, login.html, css/app.css
+web/                      frontend (sem build; fonte Archivo, licença OFL, e ícones Phosphor, licença MIT, incluídos)
+  index.html, login.html, css/app.css, css/styles.css (estilos), css/mural.css
   js/app.js               conexão SSE, histórico, abas
   js/ui.js, spark.js      utilidades e gráfico
   js/modules/             UMA PÁGINA/ABA POR ARQUIVO (registradas em modules/index.js)
@@ -399,6 +473,11 @@ e adicione em `web/js/modules/index.js`. Use `app.onSnapshot(fn)` para receber d
 | GET | `/api/apps/<id>/icon` | ícone do aplicativo |
 | POST | `/api/apps/<id>/launch` | abre o aplicativo na sessão do usuário |
 | GET/POST | `/api/game` | jogo atual e FPS; `{"fps_enabled": true}` liga a leitura |
+| POST | `/api/game/not-game` | `{"key": "exe:wallpaper", "name": "Wallpaper", "ignored": true}`; `"ignored": false` desfaz |
+| GET/POST | `/api/mural` | preferências do Mural; `GET /api/mural/cities?q=`, `/api/mural/games`, `GET/POST /api/mural/art/<key>` (`POST .../reset`) |
+| GET/POST | `/api/mural/background` | imagem de fundo do Início; `POST` com `{"image": "data:image/jpeg;base64,..."}`; `POST /api/mural/background/reset` remove |
+| POST | `/api/webhook/notify` | notificação de outro programa (token, ver "Notificações por webhook"); `GET /api/webhook`, `POST /api/webhook/token`, `/revoke`, `/test` |
+| GET | `/api/panel-update` | versão instalada × GitHub e changelog; `POST /api/panel-update/check` verifica agora |
 | POST | `/api/media` | `{"player": "spotify", "op": "play_pause"\|"next"\|"previous"\|"seek", "offset": 10}` (offset em segundos, só no seek) |
 | GET/POST | `/api/audio` | estado do áudio; `{"op": "set_default"\|"volume"\|"mute"\|"move", ...}` |
 | GET | `/api/display` | monitores (`label` do EDID, `connector`, `primary`, `scale`) e modos |

@@ -33,6 +33,9 @@ class Context:
         self.game = None        # GameMonitor (jogo atual / FPS)
         self.alerts = None      # Alerts
         self.updates = None     # Updates
+        self.selfupdate = None  # SelfUpdate
+        self.mural = None       # Mural
+        self.webhook = None     # Webhook
         self.power_timer = None # PowerTimer
         self.media = None       # Media (MPRIS), criado pelo coletor "media"
         self.focus = None       # FocusMonitor, criado pelo coletor "focus"

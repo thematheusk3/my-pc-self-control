@@ -1,4 +1,5 @@
-import { $, bytes, esc, h, meter, mhz, pct, rate, tempChip, toast } from "../ui.js";
+import { ic } from "../icons.js";
+import { $, bytes, esc, h, meter, mhz, pct, rate, temp, tempChip, tempStatus, toast } from "../ui.js";
 import { Spark } from "../spark.js";
 import { openProcessSheet } from "../procsheet.js";
 import { STATUS, artSrc, controlMedia, livePos, mediaButtons, mmss } from "../media.js";
@@ -14,8 +15,18 @@ function card(id, title, extra = "") {
 function mount(el, a) {
   app = a; root = el;
   const gpus = app.info.info.gpu?.gpus || [];
-  el.innerHTML = `<div class="grid">
-    ${card("ov-cpu", "CPU")}
+  el.innerHTML = `<section class="vitals" aria-label="Resumo do PC">
+      <div class="vitals-state good" data-state>
+        <h1><span class="v-live" data-state-title>Lendo o PC…</span><span class="v-stale">Sem dados novos do PC</span></h1>
+        <p data-state-text></p>
+      </div>
+      <figure class="vitals-cores">
+        <div class="cores" data-cores></div>
+        <figcaption data-cores-cap>Uso de cada thread da CPU</figcaption>
+      </figure>
+    </section>
+    <div class="grid">
+    ${card("ov-cpu", "CPU", "span-2")}
     ${gpus.map((g, i) => card(`ov-gpu-${i}`, gpus.length > 1 ? `GPU ${i + 1}` : "GPU")).join("")}
     ${card("ov-now", "No PC agora")}
     ${card("ov-game", "Jogo")}
@@ -30,7 +41,6 @@ function mount(el, a) {
   $("#ov-cpu [data-body]", el).innerHTML = `
     <div class="hero-row"><div class="hero num" data-v="total">—</div></div>
     <div class="spark" data-spark="cpu"></div>
-    <div class="cores" data-cores></div>
     <div class="stats" data-stats></div>`;
   sparks.cpu = new Spark($("[data-spark=cpu]", el), { series: [{ key: "cpu.total" }], min: 0, max: 100, format: v => pct(v, 1) });
 
@@ -103,7 +113,7 @@ function mount(el, a) {
     if (app.snapshot) update(app.snapshot);
   }));
   $("[data-body]", top).innerHTML = `<ul class="top-list" data-list></ul>
-    <div style="margin-top:10px"><a class="btn btn-sm" href="#processes">Ver todos os processos →</a></div>`;
+    <div style="margin-top:10px"><a class="btn btn-sm" href="#processes">Ver todos os processos</a></div>`;
   $("[data-list]", top).addEventListener("click", e => {
     const li = e.target.closest("li[data-pid]");
     if (!li) return;
@@ -149,7 +159,7 @@ function update(snap) {
     $("[data-sub]", el).textContent = `${c.model} · ${c.cores}C/${c.threads}T`;
     $("[data-chip]", el).innerHTML = tempChip(c.temp);
     $("[data-v=total]", el).innerHTML = `${c.total.toFixed(0)}<small>%</small>`;
-    const cores = $("[data-cores]", el);
+    const cores = $("[data-cores]", root);
     cores.style.setProperty("--n", c.per_core.length);
     if (cores.children.length !== c.per_core.length) cores.innerHTML = c.per_core.map(() => `<div class="core"><i></i></div>`).join("");
     c.per_core.forEach((v, i) => {
@@ -157,11 +167,14 @@ function update(snap) {
       k.firstChild.style.height = `${v}%`;
       k.title = `Thread ${i}: ${v.toFixed(0)}%${c.freq.per_core[i] ? ` · ${mhz(c.freq.per_core[i])}` : ""}`;
     });
+    $("[data-cores-cap]", root).textContent = `Uso de cada uma das ${c.per_core.length} threads da CPU`;
     $("[data-stats]", el).innerHTML =
       stat("Clock médio", mhz(c.freq.avg)) + stat("Temperatura", c.temp != null ? `${c.temp.toFixed(1)} °C` : "—") +
       stat("Load 1/5/15", c.load.map(x => x.toFixed(2)).join(" ")) +
       stat("Usuário / Sist.", `${c.breakdown.user.toFixed(0)}% / ${c.breakdown.system.toFixed(0)}%`);
   }
+
+  updateState(d);
 
   // GPUs
   (d.gpu?.gpus || []).forEach((g, i) => {
@@ -212,7 +225,7 @@ function update(snap) {
       note = g.enabled ? "A leitura de FPS está ligada e começa quando um jogo abrir com o MangoHud."
         : "Leitura de FPS desligada (não gasta nada). Ative em \"FPS\" acima.";
     }
-    if (g.enabled && g.config_ok === false) note += ` ⚠ O MangoHud.conf foi alterado por outro programa (ex.: Goverlay); desative e ative de novo.`;
+    if (g.enabled && g.config_ok === false) note += ` ${ic("warning")} O MangoHud.conf foi alterado por outro programa (ex.: Goverlay); desative e ative de novo.`;
     $("[data-game]", el).innerHTML = body;
     $("[data-game-note]", el).innerHTML = note;
   }
@@ -265,6 +278,30 @@ function update(snap) {
   }
 }
 
+// ---------- faixa de estado: responde "está tudo bem com o PC?" e só afirma o que foi medido ----------
+function updateState(d) {
+  const el = $("[data-state]", root), issues = [];
+  const check = (name, t) => {
+    const s = tempStatus(t);
+    if (s && (s.cls === "serious" || s.cls === "critical")) issues.push({ cls: s.cls, text: `${name} a ${temp(t)}` });
+  };
+  check("CPU", d.cpu?.temp);
+  (d.gpu?.gpus || []).forEach((g, i, all) => check(all.length > 1 ? `GPU ${i + 1}` : "GPU", g.temp));
+  const mem = d.memory?.percent;
+  if (mem >= 95) issues.push({ cls: "critical", text: `memória em ${mem.toFixed(0)}%` });
+  else if (mem >= 90) issues.push({ cls: "serious", text: `memória em ${mem.toFixed(0)}%` });
+
+  const unread = d.alerts?.unread || 0;
+  const alerts = unread ? `<a href="#alerts">${unread === 1 ? "1 alerta novo" : `${unread} alertas novos`}</a>` : "";
+  const worst = issues.some(x => x.cls === "critical") ? "critical" : issues.length ? "serious" : "good";
+  el.className = `vitals-state ${worst}`;
+  $("[data-state-title]", el).textContent = !issues.length ? "Tudo normal"
+    : worst === "critical" ? "Precisa de atenção" : "Fique de olho";
+  const text = issues.length ? issues.map(x => x.text).join(", ")
+    : d.cpu?.temp == null ? "Nada fora do normal. Sem leitura de temperatura da CPU." : "Temperaturas e memória dentro do normal.";
+  $("[data-state-text]", el).innerHTML = [esc(text[0].toUpperCase() + text.slice(1)), alerts].filter(Boolean).join(" ");
+}
+
 // ---------- agora no PC ----------
 const sinceTxt = t => { const s = Date.now() / 1000 - t; return s < 60 ? "agora" : s < 3600 ? `há ${Math.floor(s / 60)} min` : `há ${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
 function updateNow(f, m, ts) {
@@ -275,7 +312,7 @@ function updateNow(f, m, ts) {
   let sub = "";
   if (!f) fe.innerHTML = "";
   else if (!f.session) fe.innerHTML = `<div class="stat-label">Janela em foco</div><p class="muted" style="margin:2px 0">Ninguém logado no PC.</p>`;
-  else if (f.locked) fe.innerHTML = `<div class="stat-label">Janela em foco</div><p style="margin:2px 0">🔒 Sessão bloqueada</p>`;
+  else if (f.locked) fe.innerHTML = `<div class="stat-label">Janela em foco</div><p style="margin:2px 0">${ic("lock")} Sessão bloqueada</p>`;
   else if (w) {
     const appName = w.desktop || w.cls || w.process || "?";
     fe.innerHTML = `<div class="stat-label">Janela em foco</div>
@@ -313,7 +350,7 @@ function updateNow(f, m, ts) {
     }
     if (!sub) sub = `${p.app}: ${p.title}`;
   }
-  $("[data-sub]", el).textContent = p ? `♪ ${p.title}${p.artist ? ` · ${p.artist}` : ""}` : sub;
+  $("[data-sub]", el).textContent = p ? `${p.title}${p.artist ? ` · ${p.artist}` : ""}` : sub;
 }
 
 // ---------- downloads da Steam ----------
@@ -346,4 +383,4 @@ function updateSteam(st, net) {
   }).join("") + `<p class="note">Lido dos arquivos da Steam (que atualizam o progresso em saltos). A velocidade é o tráfego do processo da Steam.</p>`;
 }
 
-export default { id: "overview", title: "Visão geral", icon: "▦", mount, show: () => app.snapshot && update(app.snapshot) };
+export default { id: "overview", title: "Visão geral", icon: ic("squares-four"), mount, show: () => app.snapshot && update(app.snapshot) };

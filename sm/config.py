@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,6 +45,9 @@ class Config:
     fan_hysteresis: float = 3.0          # °C: só desce se a temperatura cair isso abaixo do ponto
     fan_step_down: float = 2.0           # %/s máximos de queda
     fan_on_exit: str = "firmware"        # firmware | full | keep
+    # aviso de versão nova (consulta o GitHub; não instala nada)
+    update_check: bool = True
+    update_repo: str = "thematheusk3/my-pc-self-control"
 
 
 def load(path: Path | None = None) -> Config:
@@ -57,6 +61,10 @@ def load(path: Path | None = None) -> Config:
     security = raw.get("security", {})
     collectors = raw.get("collectors", {})
     fan = raw.get("fan", {})
+    update = raw.get("update", {})
+    repo = str(update.get("repo", Config.update_repo))
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
+        raise ValueError(f'[update] repo inválido: "{repo}" (use o formato dono/repositorio)')
 
     cfg = Config(
         host=server.get("host", Config.host),
@@ -89,5 +97,7 @@ def load(path: Path | None = None) -> Config:
         fan_hysteresis=max(0.0, float(fan.get("hysteresis", Config.fan_hysteresis))),
         fan_step_down=max(0.1, float(fan.get("step_down", Config.fan_step_down))),
         fan_on_exit=fan.get("on_exit", Config.fan_on_exit) if fan.get("on_exit") in ("firmware", "full", "keep") else Config.fan_on_exit,
+        update_check=bool(update.get("check", True)),
+        update_repo=repo,
     )
     return cfg

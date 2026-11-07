@@ -1,3 +1,4 @@
+import { ic } from "../icons.js";
 import { $, duration, esc, toast } from "../ui.js";
 
 let app, root;
@@ -33,8 +34,8 @@ function mount(el, a) {
     ${app.info.features.power ? `<article class="card" data-power>
       <div class="card-head"><div class="card-title">Energia</div></div>
       <div class="power-btns">
-        <button class="btn" data-act="reboot">↻ Reiniciar</button>
-        <button class="btn btn-danger" data-act="poweroff">⏻ Desligar</button>
+        <button class="btn" data-act="reboot">${ic("arrow-clockwise")} Reiniciar</button>
+        <button class="btn btn-danger" data-act="poweroff">${ic("power")} Desligar</button>
       </div>
       <label class="check" style="margin-top:12px"><input type="checkbox" data-force checked> Forçar finalização</label>
       <p class="note" style="margin-top:6px">Forçar ignora programas que estão bloqueando o desligamento (downloads, jogos, "deseja salvar?")
@@ -100,18 +101,18 @@ async function refreshSession() {
   $("[data-sess-body]", card).innerHTML = (s ? `
       <dl class="kv" style="margin-bottom:12px"><dt>Usuário</dt><dd>${esc(st.user)}</dd><dt>Sessão</dt><dd>${esc(s.desktop || "")} · ${esc(s.type)}</dd></dl>
       <div class="power-btns">
-        <button class="btn" data-sess="lock" ${s.locked ? "disabled" : ""}>🔒 Bloquear</button>
-        <button class="btn btn-primary" data-sess="unlock" ${s.locked ? "" : "disabled"}>🔓 Desbloquear</button>
+        <button class="btn" data-sess="lock" ${s.locked ? "disabled" : ""}>${ic("lock")} Bloquear</button>
+        <button class="btn btn-primary" data-sess="unlock" ${s.locked ? "" : "disabled"}>${ic("lock-open")} Desbloquear</button>
       </div>`
     : st.other_users?.length
-    ? `<p class="confirm-text" style="margin-top:0"><b>⚠ Há uma sessão aberta de ${esc(st.other_users.join(", "))}, mas o painel está ligado à conta ${esc(st.user)}${st.service_user !== st.user ? ` (serviço rodando como ${esc(st.service_user)})` : ""}.</b>
+    ? `<p class="confirm-text" style="margin-top:0"><b>${ic("warning")} Há uma sessão aberta de ${esc(st.other_users.join(", "))}, mas o painel está ligado à conta ${esc(st.user)}${st.service_user !== st.user ? ` (serviço rodando como ${esc(st.service_user)})` : ""}.</b>
        Áudio, tela, captura e apps não funcionam assim. Reinstale a partir da conta certa: <code>sudo ./install.sh --user ${esc(st.other_users[0])}</code></p>`
     : `<p class="confirm-text" style="margin-top:0">Ninguém está logado: o PC está na tela de login, que não pode ser controlada pelo painel.</p>`) +
     `<p class="note">${auto
-      ? `✔ <b>Entrar pelo celular ativado</b>: ao ligar, o PC entra sozinho em <b>${esc(st.user)}</b> com a tela bloqueada; desbloqueie por aqui.`
+      ? `${ic("check")} <b>Entrar pelo celular ativado</b>: ao ligar, o PC entra sozinho em <b>${esc(st.user)}</b> com a tela bloqueada; desbloqueie por aqui.`
       : `Para entrar pelo celular ao ligar o PC, ative o login automático com a tela já bloqueada. Na máquina, rode:<br>
          <code>sudo /opt/applications/self-monitoring/tools/login-pelo-celular.sh ativar</code>
-         ${st.autologin_me && !st.lock_on_start ? `<br><b>⚠ O login automático está ligado SEM bloqueio ao iniciar: qualquer um que ligar o PC entra na sua conta.</b>` : ""}`}</p>`;
+         ${st.autologin_me && !st.lock_on_start ? `<br><b>${ic("warning")} O login automático está ligado SEM bloqueio ao iniciar: qualquer um que ligar o PC entra na sua conta.</b>` : ""}`}</p>`;
 }
 
 export function openUnlock(a, onDone) {
@@ -158,7 +159,7 @@ function setupPower(el) {
     if (st.poweroff !== "yes" && st.poweroff !== "unknown") {
       const w = $("[data-power-warn]", card);
       w.hidden = false;
-      w.innerHTML = `⚠ O serviço ainda não tem permissão para desligar (o sistema pediria senha). Rode <code>sudo ./install.sh</code> na pasta do self-monitoring.`;
+      w.innerHTML = `${ic("warning")} O serviço ainda não tem permissão para desligar (o sistema pediria senha). Rode <code>sudo ./install.sh</code> na pasta do self-monitoring.`;
     }
   }).catch(() => {});
   card.addEventListener("click", e => {
@@ -246,14 +247,14 @@ function renderUpdates(st) {
   card.querySelector("[data-upd-refresh]").disabled = st.running;
   const body = $("[data-upd-body]", card);
   const rb = st.reboot;
-  const rebootHtml = rb ? `<p class="fan-alert warning" style="margin:0 0 8px">↻ <b>O PC precisa reiniciar</b> para usar o que foi atualizado${
+  const rebootHtml = rb ? `<p class="fan-alert warning" style="margin:0 0 8px">${ic("arrow-clockwise")} <b>O PC precisa reiniciar</b> para usar o que foi atualizado${
     rb.reason === "kernel" ? `: está rodando o kernel <span class="mono">${esc(rb.running)}</span>${rb.installed ? `, mas o instalado é <span class="mono">${esc(rb.installed)}</span>` : ", que já foi removido do disco"}.
       Até reiniciar, módulos novos (ex.: um pendrive ou driver carregado agora) podem não funcionar` : ""}.</p>` : "";
   if (st.count == null) { body.innerHTML = rebootHtml + (st.running ? "Verificando…" : "Ainda não verificado."); return; }
   const by = {};
   for (const i of st.items) (by[i.source] ||= []).push(i);
   const sens = st.items.filter(i => i.sensitive);
-  body.innerHTML = `${rebootHtml}<p style="margin:0 0 8px">${st.count ? `<b>${st.count}</b> atualizações pendentes` : "Tudo atualizado ✔"}
+  body.innerHTML = `${rebootHtml}<p style="margin:0 0 8px">${st.count ? `<b>${st.count}</b> atualizações pendentes` : "Tudo atualizado"}
       · verificado ${new Date(st.checked * 1000).toLocaleString("pt-BR")}${st.running ? " · verificando…" : ""}</p>
     ${sens.length ? `<p class="fan-alert warning" style="margin:0 0 8px">Inclui pacotes sensíveis (${esc(sens.map(i => i.name).join(", "))}).
       Atualize <b>sentado na frente do PC</b> e reinicie em seguida.</p>` : ""}
@@ -414,7 +415,7 @@ function update(snap) {
 
   const i = app.info;
   $("[data-srv]", root).innerHTML = `<div class="card-head"><div class="card-title">Monitor</div></div><dl class="kv">
-    ${row("Versão", esc(i.version))}
+    ${row("Versão", `<a href="#update">${esc(i.version)}</a>`)}
     ${row("Amostragem", `${i.sample_interval}s`)}
     ${row("Processos", `a cada ${i.process_interval}s`)}
     ${row("Finalizar processos", i.features.kill ? "Ativado" : "Desativado")}
@@ -424,7 +425,7 @@ function update(snap) {
 }
 
 export default {
-  id: "system", title: "Sistema", icon: "ⓘ", mount,
+  id: "system", title: "Sistema", icon: ic("cpu"), mount,
   show: () => {
     if (app.snapshot) update(app.snapshot);
     if (app.info.features.unlock) { refreshSession(); sessTimer = setInterval(refreshSession, 5000); }

@@ -43,3 +43,9 @@ emergency_temp = 92       # acima disso: 100%, em qualquer modo
 hysteresis = 3            # °C de folga antes de reduzir
 step_down = 2             # queda máxima em %/s (evita sobe-e-desce)
 on_exit = "firmware"      # ao parar o serviço: firmware (devolve à placa) | full (100%) | keep
+
+[update]
+# A aba Atualização consulta o GitHub (só com o painel aberto, no máximo a cada 6 h) para avisar de versão nova.
+# Não baixa nem instala nada. Com false, mostra só o changelog desta versão.
+check = true
+repo = "thematheusk3/my-pc-self-control"

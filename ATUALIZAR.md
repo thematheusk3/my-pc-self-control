@@ -54,7 +54,8 @@ sudo ./install.sh            # ou: sudo ./install.sh --root
 
 ## Conferir a versão
 
-- No painel: aba **Sistema**, cartão **Monitor**, linha **Versão**.
+- No painel: aba **Sistema**, cartão **Monitor**, linha **Versão**, ou aba **Atualização** (0.5.0+), que também avisa quando há
+  versão nova no GitHub.
 - No terminal: `python3 -c "import sys; sys.path.insert(0,'/opt/applications/self-monitoring'); import sm; print(sm.__version__)"`
 
 O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
@@ -90,3 +91,19 @@ sudo ./install.sh                  # com --root se o serviço for root
 ```
 
 Para voltar a receber atualizações depois: `git checkout main` e `./atualizar.sh`.
+
+### Voltar para a interface antiga
+
+A interface anterior à repaginada (0.5.0) está guardada na marca `ui-classica-0.4.7`. Este comando troca só a pasta `web/` e
+mantém o restante do painel atualizado (as correções do servidor continuam valendo):
+
+```bash
+cd ~/Projetos/self-monitoring
+git fetch --tags
+git restore --source=ui-classica-0.4.7 -- web
+sudo ./install.sh --root          # ou sem --root, do jeito que o serviço foi instalado
+```
+
+Para voltar à interface nova: `git restore -- web` e o mesmo `install.sh`. Depois de um `git restore --source`, o
+`git status` mostra a pasta `web/` como alterada; desfaça com `git restore -- web` antes de um `./atualizar.sh`. Mural,
+Aparência, webhook e a aba Atualização não existem na interface antiga.

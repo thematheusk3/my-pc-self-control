@@ -1,4 +1,5 @@
 // Aba Apps: abre pelo celular os aplicativos instalados (lidos dos arquivos .desktop).
+import { ic } from "../icons.js";
 import { $, esc, toast } from "../ui.js";
 import { openUnlock } from "./system.js";
 
@@ -73,7 +74,7 @@ function render() {
 }
 
 export default {
-  id: "apps", title: "Apps", icon: "▤", mount,
+  id: "apps", title: "Apps", icon: ic("grid-nine"), mount,
   enabled: a => !!a.info?.features?.launch,
   show: load,
 };

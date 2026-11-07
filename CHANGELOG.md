@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0
+Trazido da versão Windows (0.6.0-win a 0.11.1-win), na ordem do [PARIDADE.md](PARIDADE.md):
+- **Interface repaginada**: tema "placa do PC", faixa de estado ("Tudo normal" ou o que precisa de atenção) com o uso de cada
+  thread, barra lateral no PC e barra inferior com "Mais" no celular, ícones SVG (Phosphor) e fonte própria (Archivo).
+  Mesmas funções e mesma API. A interface antiga fica na marca `ui-classica-0.4.7` (ver [ATUALIZAR.md](ATUALIZAR.md)).
+- **Aparência**: três estilos (Placa, Vidro, Osciloscópio) e seis cores (verde, azul, vermelha, roxa, preta, amarela), no tema
+  escuro e no claro; a escolha fica salva em cada aparelho. A aba Ventoinha, só do Linux, funciona nos três estilos.
+- **Aba Atualização**: versão instalada × GitHub, changelog, comando para atualizar e "Nova" na navegação quando há versão maior.
+  Só lê dois arquivos públicos do repositório, no máximo a cada 6 h; desliga com `[update] check = false`.
+- **Mural**: tela cheia com relógio, clima (Open-Meteo), jogo (arte da Steam ou sua, FPS do MangoHud, CPU, GPU, temperaturas) e
+  música, com cores vivas tiradas da arte, motor de eventos (avisos no canto, críticos em tela cheia), seis fundos para o Início
+  e dock. Abre também direto em `/#mural:abrir`.
+- **Notificações por webhook**: `POST /api/webhook/notify` com token (só o hash fica salvo), limites por minuto e por IP; aparece
+  no painel, no Mural, na tela do PC e no ntfy (ou só no painel, com `silent`).
+- **Apps que não são jogos**: marque em Mural > Apps que não são jogos (Steam ou MangoHud) e eles somem do jogo atual e do FPS.
+- Servidor aceita rajadas de pedidos (`request_queue_size = 128`): a página nova pede vários arquivos de uma vez.
+- Notificações de webhook na tela do PC sem o "⚠" quando não são críticas.
+
 ## 0.4.7
 Trazido da versão Windows (tudo da seção 1 do [PARIDADE.md](PARIDADE.md) que se aplica ao Linux):
 - Controles > Tela: cada monitor aparece com o **nome real** (EDID, ex.: "LG ULTRAGEAR (DP-4)"), o **tipo de conexão**

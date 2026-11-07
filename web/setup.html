@@ -3,19 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#121211">
+<meta name="theme-color" content="#0d1f1a">
 <title>Criar senha · Self Monitoring</title>
 <link rel="icon" href="/icon.svg">
 <link rel="stylesheet" href="/css/app.css">
 </head>
 <body class="login-page">
   <form class="login-card" method="post" action="/setup">
-    <img src="/icon.svg" alt="" width="48" height="48">
+    <img src="/icon.svg" alt="" width="40" height="40">
     <h1>Criar senha</h1>
     <p class="muted">Primeiro acesso. Cadastre a senha que vai usar para entrar no painel (mínimo 6 caracteres).</p>
-    <input name="password" type="password" autocomplete="new-password" placeholder="Nova senha" minlength="6" required autofocus>
-    <input name="password2" type="password" autocomplete="new-password" placeholder="Repita a senha" minlength="6" required>
-    <p class="login-error" hidden></p>
+    <label for="pw">Nova senha</label>
+    <input id="pw" name="password" type="password" autocomplete="new-password" minlength="6" required autofocus>
+    <label for="pw2">Repita a senha</label>
+    <input id="pw2" name="password2" type="password" autocomplete="new-password" minlength="6" required>
+    <p class="login-error" role="alert" hidden></p>
     <button class="btn btn-primary" type="submit">Salvar e entrar</button>
   </form>
   <script>

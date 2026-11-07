@@ -132,13 +132,30 @@ class Alerts:
         log.warning("alerta: %s — %s", a["title"], text)
         threading.Thread(target=self._deliver, args=(a, pc), daemon=True).start()
 
+    def external(self, title: str, text: str = "", level: str = "info", icon: str = "", url: str = "", source: str = "",
+                 duration: int = 0, display: str = "auto", silent: bool = False) -> dict:
+        """Notificação de outro programa (webhook): não passa por regra nem cooldown.
+        silent=True: fica só no painel e no Mural, sem PC nem ntfy."""
+        with self.lock:
+            self._seq += 1
+            a = {"seq": self._seq, "rule": "webhook", "title": title, "text": text, "level": level, "icon": icon,
+                 "url": url, "source": source, "duration": duration, "display": display, "time": time.time(), "read": False}
+            self.history.appendleft(a)
+            self._save()
+        log.info("webhook: %s (%s)", title, source or "sem origem")
+        if not silent:
+            threading.Thread(target=self._deliver, args=(a,), daemon=True).start()
+        return a
+
     def _deliver(self, a: dict, pc: bool = True) -> None:
         ch = self.conf["channels"]
         if pc and ch.get("pc"):
             try:
                 from .desktop import notify_pc
-                notify_pc(f"⚠ {a['title']}", a["text"], urgency="critical" if a["level"] == "critical" else "normal",
-                          icon="dialog-warning")
+                webhook = a.get("rule") == "webhook" and a["level"] != "critical"
+                head = a["title"] if webhook else f"⚠ {a['title']}"
+                notify_pc(head, a["text"], urgency="critical" if a["level"] == "critical" else "normal",
+                          icon="dialog-information" if webhook else "dialog-warning")
             except Exception:  # noqa: BLE001
                 pass
         if ch.get("ntfy"):

@@ -1,4 +1,5 @@
 // Painel de detalhes de processo + finalizar (compartilhado entre abas).
+import { ic } from "./icons.js";
 import { $, bytes, esc, pct, toast } from "./ui.js";
 import { openInspect } from "./inspect.js";
 
@@ -18,7 +19,7 @@ export function openProcessSheet(app, proc, onDone) {
       ${proc.ppid != null ? `<dt>PID pai</dt><dd>${proc.ppid}</dd>` : ""}
       <dt>Iniciado</dt><dd>${started}</dd>
     </dl>
-    ${proc.critical && canKill ? `<p class="fan-alert warning" style="margin:8px 0">⚠ Processo essencial do sistema: finalizá-lo pode derrubar a sessão gráfica, o som ou a rede.</p>` : ""}
+    ${proc.critical && canKill ? `<p class="fan-alert warning" style="margin:8px 0">${ic("warning")} Processo essencial do sistema: finalizá-lo pode derrubar a sessão gráfica, o som ou a rede.</p>` : ""}
     <div class="confirm-text" hidden></div>
     <div class="sheet-actions">
       ${app.info?.features?.exited ? `<button class="btn full" data-inspect>Analisar processo</button>` : ""}

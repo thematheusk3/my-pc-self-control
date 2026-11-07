@@ -1,4 +1,5 @@
 // Aba Ventoinha: status ao vivo, modo (automático / manual / placa), velocidade fixa e editor de curva.
+import { ic } from "../icons.js";
 import { $, esc, pct, toast } from "../ui.js";
 import { Spark } from "../spark.js";
 
@@ -283,7 +284,7 @@ function update(snap) {
 }
 
 export default {
-  id: "fan", title: "Ventoinha", icon: "✇", mount,
+  id: "fan", title: "Ventoinha", icon: ic("fan"), mount,
   enabled: a => !!a.info?.features?.fan,
   show: () => { if (app.snapshot) update(app.snapshot); },
 };

@@ -10,110 +10,24 @@ backend de cada sistema.
 **Regra:** ao implementar algo novo em uma versão, registre aqui se dá para levar para a outra (e como), ou se é
 impossível (e por quê). Quando for portado, mova a linha para "Já equalizado" e anote a versão.
 
-Situação em: versão Linux 0.4.7, versão Windows 0.11.1-win.
+Situação em: versão Linux 0.5.0, versão Windows 0.11.1-win.
 
 ## 1. Só no Windows: dá para levar ao Linux
 
 | Recurso | Como foi feito no Windows | Como fazer no Linux | Esforço |
 |---|---|---|---|
-| **Interface repaginada** (0.6.0-win, **aguardando aprovação**: portar só se agradar no Windows) | Tema "placa do PC", faixa de estado com LEDs por thread, barra lateral, "Mais" no celular, ícones SVG, fonte própria. Mesmas funções e mesma API | Ver "Levar a interface repaginada ao Linux", logo abaixo desta tabela | Baixo a médio |
-| **Servidor aceita rajadas de pedidos** (0.6.0-win) | `request_queue_size = 128` na classe `Server` do `sm/server.py`; com o padrão (5), o Windows recusava conexões ao carregar a página | A mesma linha no `sm/server.py`. No Linux o sintoma é mais raro, mas a linha é inofensiva | Baixo |
-| **Aba Atualização e aviso de versão nova** (0.7.0-win) | `sm/selfupdate.py` compara `__version__` com o `sm/__init__.py` do GitHub e traz o `CHANGELOG.md`; rotas `GET /api/panel-update` e `POST /api/panel-update/check`; `[update]` no config; `web/js/modules/update.js` marca "Nova" na navegação | Ver "Levar a aba Atualização ao Linux", abaixo desta tabela | Baixo |
-| **Mural** (0.8.0-win; cores vivas e motor de eventos na 0.9.0-win) | `sm/mural.py` (preferências em `data/mural.json`, clima Open-Meteo, arte), `web/js/mural-stage.js`, `mural-palette.js`, `mural-events.js`, `web/js/modules/mural.js`, `web/css/mural.css`; `game_key` e `steam_games` em `sm/game.py` | Ver "Levar o Mural e o webhook ao Linux", abaixo desta tabela | Médio |
-| **Notificações por webhook** (0.8.0-win) | `sm/webhook.py` (token com hash, limites), `Alerts.external`, rotas `/api/webhook/*`, `/api/webhook/notify` em `PUBLIC`, cartão em `alerts.js` | Portável sem mudança de lógica; ver a mesma seção | Baixo |
-| **Cores e estilos do painel** (0.10.0-win; estilos na 0.11.0-win) | Blocos `[data-palette]` em `web/css/app.css`, `web/css/styles.css`, `web/js/theme.js` (janela Aparência) e `web/js/theme-boot.js` (aplica antes de a página aparecer). Só frontend | Copiar junto com a interface repaginada. O estilo Vidro exige `mural-backdrop.js`. Sem mudança de lógica | Baixo |
-| **Apps que não são jogos** (0.9.1-win) | Lista em `data/game.json` (`not_games`), `set_not_game` e `recent_games` em `sm/game.py`, rota `POST /api/game/not-game`, cartão em `web/js/modules/mural.js`. Vale para jogo por `.exe` e da Steam | Levar junto com o Mural. O MangoHud só mede o que foi lançado com ele, então falsos positivos são raros: basta filtrar por `game_key` em `status()`. A chave de jogo sem Steam precisa do `exe` no jogo do MangoHud | Baixo |
 | Captura de tela sem programa externo | GDI (BitBlt) + encoder PNG próprio | No Wayland só pelo portal (`org.freedesktop.portal.Screenshot`) ou Spectacle; manter o Spectacle | — (não vale) |
 
-### Ordem para levar tudo ao Linux
+Tudo o que valia a pena foi levado ao Linux na 0.5.0 (ver "Já equalizado"). Os guias de porte passo a passo estão no
+histórico do git (commit `75c7d6c` do repositório Linux), se precisar repetir algo parecido.
 
-Tudo depende da aprovação da interface repaginada. Cada etapa precisa da anterior, e o melhor é fazer uma versão do Linux por
-etapa, rodando os testes e movendo a linha para "Já equalizado" ao terminar.
+Cuidados ao mexer no frontend, que custaram retrabalho no Windows e valem nos dois:
 
-| Etapa | O que leva | Versões do Windows | Commits | Guia |
-|---|---|---|---|---|
-| 1 | Interface repaginada | 0.6.0-win | `54e84ac` | "Levar a interface repaginada ao Linux" |
-| 2 | Cores e estilos | 0.10.0-win, 0.11.0-win | `2640c7a`, `c1514bc` | "Levar as cores e os estilos ao Linux" |
-| 3 | Aba Atualização | 0.7.0-win | `c75d03f` | "Levar a aba Atualização ao Linux" |
-| 4 | Webhook | 0.8.0-win | `0a9c3c5` | "Levar o Mural e o webhook ao Linux", passo 1 |
-| 5 | Mural, com cores vivas, eventos, fundos e dock | 0.8.0-win a 0.10.0-win | `0a9c3c5`, `df34854`, `2640c7a` | "Levar o Mural e o webhook ao Linux", demais passos |
-| 6 | Apps que não são jogos | 0.9.1-win | `2140a7a` | "Levar o Mural e o webhook ao Linux", passo 9 |
-
-Não vão ao Linux: `atualizar.cmd` (lá já existe o `atualizar.sh`), `Enable-LhmWebServer` (seção 3) e `tabby.exe` em `NOT_GAMES`.
-
-### Levar as cores e os estilos ao Linux
-
-Só frontend. Faça logo depois da interface repaginada.
-
-1. Copie `web/css/styles.css`, `web/js/theme.js`, `web/js/theme-boot.js`, `web/js/mural-backdrop.js` e `web/js/mural-palette.js`. Os dois últimos são necessários mesmo antes do Mural: `theme.js` desenha o fundo do estilo Vidro com eles.
-2. Os blocos `[data-palette]` já vêm no `web/css/app.css` copiado inteiro na etapa da interface. Se ele foi copiado da 0.6.0-win, copie de novo do Windows atual.
-3. Em `web/index.html`: `<link rel="stylesheet" href="/css/styles.css">` antes de `mural.css`, `<script src="/js/theme-boot.js"></script>` logo depois dos estilos, e título e `aria-label` do `#theme-btn` como "Aparência". É preciso existir `<meta name="theme-color">`.
-4. Em `web/js/app.js`: importe `setupAppearance` de `theme.js` e, em `setupTheme()`, troque a leitura do `localStorage` e o clique que alterna o tema por `setupAppearance(app)`.
-5. O servidor não muda: os arquivos novos só carregam depois do login, então não entram em `PUBLIC`. As telas de login e cadastro continuam com as cores padrão.
-6. Só no Linux: confira a aba Ventoinha nos estilos Vidro e Osciloscópio. `styles.css` não tem regra para `.fan-*`, porque essa aba não existe no Windows.
-7. Confira no PC e no celular, nos dois temas.
-
-Cuidados que custaram retrabalho no Windows:
-
-- Não use `light-dark()` nos tokens: nos testes o tema escuro não aplicava. Cada cor tem regras explícitas para escuro, `[data-theme="light"]` e `prefers-color-scheme`.
+- Não use `light-dark()` nos tokens de cor: o tema escuro não aplicava. Cada cor tem regras explícitas para escuro,
+  `[data-theme="light"]` e `prefers-color-scheme`.
 - Não ponha `backdrop-filter` em `.topbar` no celular: a barra `.tabs` fica dentro dela e é fixa, e o desfoque a prende ao cabeçalho.
 - `--bg` e `--accent` precisam continuar em hexadecimal: `theme.js` e `mural-backdrop.js` fazem contas com esses valores.
-
-### Levar o Mural e o webhook ao Linux
-
-Faça depois da interface repaginada: usam `icons.js` e os tokens de cor.
-
-1. **Webhook:** copie `sm/webhook.py` e `tests/test_webhook.py`. Em `sm/alerts.py`, traga `external()` e a mudança em `_deliver`. Em `sm/server.py`, acrescente `/api/webhook/notify` a `PUBLIC` e à lista liberada antes do cadastro da senha. Em `server.py`, `ctx.webhook = Webhook(ctx.alerts)` depois dos alertas. Traga as rotas, o cartão de `alerts.js` e os descritores de `sm/audit.py`. Nada depende do sistema.
-2. **Mural, sem mudança:** copie `web/js/mural-stage.js`, `web/js/modules/mural.js`, `web/css/mural.css` e `tests/test_mural.py`, registre em `modules/index.js` e inclua `mural.css` no `index.html`. Traga os ícones novos de `icons.js`. O `sm/mural.py` só depende de `STEAM_ROOTS`, `_write_private` e `steam_games`.
-3. **`sm/game.py` do Linux:** traga `RX_KEY` e `valid_key()`, que desde a 0.9.1-win ficam em `sm/game.py` (`sm/mural.py` importa `valid_key` de lá; sem isso o Mural nem inicia). `running_game()` já devolve `appid` e o jogo sem Steam vem do MangoHud. Falta só portar `game_key()`, devolver `key` em `status()` (o `"exe"` no jogo do MangoHud é opcional: sem ele, a chave usa o nome) e trazer `steam_games()`, que é igual.
-4. **Caminhos da Steam:** `STEAM_ROOTS` já existe em `sm/desktop.py` do Linux, com as pastas nativa e Flatpak. O cache `appcache/librarycache/<appid>` deve ter o mesmo formato: confira numa instalação real.
-5. **FPS no Mural:** vem de `d.game.fps`, então funciona com o MangoHud sem mudança. No Linux, `cpu_load` e `gpu_load` por jogo existem: dá para usar no lugar do uso total.
-6. **Não muda:** clima e mídia (o frontend usa `d.media`, igual ao MPRIS atual).
-7. **Fundos do Início e dock (0.10.0-win):** `web/js/mural-backdrop.js` e os trechos em `mural-stage.js` são só frontend. No backend, `BACKGROUNDS`, `set_background`, `reset_background` e `background` em `sm/mural.py`, as rotas `/api/mural/background` e os dois textos em `sm/audit.py`. Exige `theme.js`, por causa do fundo Placa de circuito.
-8. **Cores e eventos (0.9.0-win):** `web/js/mural-palette.js` e `web/js/mural-events.js` são só frontend e entram sem mudança, assim como `display` em `sm/webhook.py` e `Alerts.external`. `sunrise` e `sunset` estão em `sm/mural.py`.
-9. **Apps que não são jogos (0.9.1-win):** em `sm/game.py` do Linux, traga `not_games`, `recent`, `set_not_game()` e a gravação em `data/game.json` junto com `fps_enabled`. O `status()` do Linux é diferente: aplique só a regra, removendo o jogo atual quando `game_key(game)` estiver na lista e devolvendo `not_games` e `recent_games`. Para o jogo do MangoHud ter chave estável, inclua `"exe"` nele. Traga a rota `POST /api/game/not-game`, o texto `game_not_game` em `sm/audit.py`, o cartão em `web/js/modules/mural.js`, as classes `.not-game*` de `mural.css` e os testes de `tests/test_features.py` que couberem.
-
-Limitações nas duas versões: impedir a tela de apagar exige HTTPS ou localhost, e o iPhone não oferece tela cheia para páginas.
-
-### Levar a aba Atualização ao Linux
-
-Só consulta o GitHub; não instala nada. Faça depois da interface repaginada, porque `update.js` usa `icons.js` e os estilos novos.
-
-1. Copie `sm/selfupdate.py`, `web/js/modules/update.js` e `tests/test_selfupdate.py`. Em `update.js` nada muda: repositório e comandos vêm do backend.
-2. Em `sm/selfupdate.py`, troque o que é do sistema: `UPDATE_STEPS = ["/opt/applications/self-monitoring/atualizar.sh"]` (a cópia instalada funciona de qualquer pasta) e um `UPDATE_NOTE` próprio.
-3. Em `sm/config.py`, acrescente `update_check` e `update_repo` (padrão `thematheusk3/my-pc-self-control`) e a leitura de `[update]`. Em `config.example.toml`, a seção `[update]`.
-4. No `server.py`, crie `ctx.selfupdate = SelfUpdate(cfg.update_repo, cfg.update_check)`; em `sm/sampler.py`, `self.selfupdate = None`. Em `sm/api/routes.py`, as duas rotas.
-5. Em `web/js/modules/index.js`, registre `update`. Com 9 módulos mais a Ventoinha, o "Mais" do celular fica com duas linhas, o que o CSS já comporta. Em `system.js`, faça a versão apontar para `#update`.
-6. Traga o bloco "Atualização do painel" e `.tab-flag` de `app.css` (se o CSS novo for copiado inteiro, já vêm), e o ícone `arrow-circle-up` em `icons.js`.
-7. Confira se o `install.sh` copia o `CHANGELOG.md` para a pasta instalada: é dele que sai o changelog quando o GitHub não responde. O formato (`## 0.4.6`) e a versão sem sufixo já funcionam com o código atual.
-
-Limitação nas duas versões: a comparação é pelo número da versão. Um commit que não aumenta `__version__` não gera aviso.
-
-### Levar a interface repaginada ao Linux
-
-Vale fazer depois de aprovar a interface no Windows. Quase tudo é frontend, e os nomes das classes foram mantidos.
-
-1. No Linux, guarde a interface atual antes de mudar: `git tag -a ui-classica-0.4.6 -m "Interface antiga" && git push origin ui-classica-0.4.6`.
-2. Copie inteiros do Windows: `web/css/app.css` (tem todas as classes do CSS do Linux), `web/icon.svg` e a pasta `web/fonts/`.
-3. Para o restante, gere o diff no repositório do Windows e aplique no do Linux. Testado na 0.4.6: 11 de 17 arquivos entram limpos e 13 trechos ficam em `.rej` (`media.js`, `apps.js`, `controls.js`, `net.js`, `overview.js`, `system.js`), quase todos trocas de emoji por `ic(...)`. Aplique esses à mão e apague os `.rej`. Os dois repositórios não têm histórico comum, então `--3way` não funciona:
-   ```bash
-   # no repositório do Windows
-   git diff ui-classica-0.5.3 v0.6.0-win -- web ':!web/css/app.css' ':!web/fonts' ':!web/icon.svg' > /tmp/ui.patch
-   # no repositório do Linux
-   git apply --reject --whitespace=nowarn /tmp/ui.patch
-   ```
-4. No `sm/server.py`, repita as três mudanças: constante `FONT`, somada a `PUBLIC` e à lista liberada antes do cadastro da senha (senão o login fica sem a fonte); cache longo para `.woff2` em `_static`; `request_queue_size = 128`.
-5. Só no Linux, desde a 0.4.7: o diff do Windows não traz o que a 0.4.7 acrescentou ao frontend; confira que sobreviveu
-   ao `git apply` e aos `.rej`: nome/conexão/escala do monitor em `controls.js` (já iguais ao Windows), "Por engine" em
-   `overview.js`, faixa de reinício pendente em `system.js`, linha "Integridade" em `inspect.js`, aviso de processo essencial e
-   `closed_windows` em `procsheet.js`, e `status`/`data` no erro de `app.api` em `app.js`.
-6. Só no Linux: em `fan.js`, troque o ícone por `icon: ic("fan")` (já incluído em `icons.js`). A aba Ventoinha entra no "Mais" do celular, e os estilos `.fan-*` já estão no CSS novo.
-7. A faixa de estado cita a temperatura da CPU quando existe. No Linux ela vem do hwmon, então "Sem leitura de temperatura" não deve aparecer.
-8. Confira nos dois temas, no PC e no celular, e mova esta linha para "Já equalizado".
-
-Não precisa portar: a correção dos ícones de apps em `sm/desktop.py` (`HBITMAP`) é específica do Windows.
-
-Para voltar atrás no Linux: `git restore --source=ui-classica-0.4.6 -- web`, seguido do `atualizar.sh` ou `install.sh`.
+- O Linux tem a aba Ventoinha (`fan.js`, classes `.fan-*`), que não existe no Windows: confira-a nos três estilos ao mudar o CSS.
 
 ## 2. Só no Linux: dá para levar ao Windows
 
@@ -159,7 +73,7 @@ Para voltar atrás no Linux: `git restore --source=ui-classica-0.4.6 -- web`, se
 
 ## Já equalizado
 
-Funciona igual nas duas versões (mesma API e mesma tela): visão geral, processos (lista, encerrados, suspeitos,
+Funciona igual nas duas versões (mesma API e, desde a 0.5.0 do Linux, a mesma interface): visão geral, processos (lista, encerrados, suspeitos,
 análise, confiáveis), rede (por programa, conexões, encerradas, portas), apps pelo celular, áudio (saída padrão,
 volume por dispositivo e **por app, inclusive a saída de cada app**, microfone), mídia com ±10 s, tela (resolução com
 reversão, brilho DDC/CI, apagar, espera), captura de tela com aviso, janela em foco, downloads da Steam, jogo atual,
@@ -182,4 +96,11 @@ Portados depois (mesma API e mesma tela nas duas versões):
 | Atualizações que pedem reinício | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: kernel rodando × instalado em `/usr/lib/modules` (`pkgbase`), `/run/reboot-required`, `needs-restarting -r` |
 | Aviso de firewall bloqueando o celular | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: `install.sh` avisa quando `nftables`/`iptables` têm política DROP e a porta não está liberada (ufw/firewalld já eram liberados) |
 | Verificação do executável (assinatura digital × integridade do pacote) | Windows → Linux | 0.5.0-win → 0.4.7 | Linux: SHA-256 do executável × banco do pacote (`pacman` mtree, `dpkg` md5sums, `rpm --dump`); alterado = sinal alto |
+| Interface repaginada (placa do PC, faixa de estado, barra lateral, "Mais" no celular, ícones e fonte) | Windows → Linux | 0.6.0-win → 0.5.0 | Interface antiga do Linux na marca `ui-classica-0.4.7`. No Linux há ainda a aba Ventoinha e o botão Desbloquear (ícone `lock-open` acrescentado ao `icons.js`) |
+| Servidor aceita rajadas de pedidos (`request_queue_size = 128`) | Windows → Linux | 0.6.0-win → 0.5.0 | Mesma linha no `sm/server.py` |
+| Aba Atualização e aviso de versão nova | Windows → Linux | 0.7.0-win → 0.5.0 | Só `UPDATE_STEPS`/`UPDATE_NOTE` mudam (`atualizar.sh` da cópia instalada); repositório padrão `thematheusk3/my-pc-self-control` |
+| Notificações por webhook | Windows → Linux | 0.8.0-win → 0.5.0 | Sem mudança de lógica; na tela do PC usa o ícone `dialog-information` quando não é crítica |
+| Mural (cores vivas, motor de eventos, fundos do Início e dock) | Windows → Linux | 0.8.0-win a 0.10.0-win → 0.5.0 | Arte do cache da Steam com o mesmo formato (nativa e Flatpak); FPS do MangoHud |
+| Cores e estilos do painel (Placa, Vidro, Osciloscópio; seis cores) | Windows → Linux | 0.10.0-win, 0.11.0-win → 0.5.0 | Só frontend |
+| Apps que não são jogos | Windows → Linux | 0.9.1-win → 0.5.0 | No Linux vale para jogo da Steam e do MangoHud (chave `exe:` vem do nome do CSV do MangoHud) |
 | Script de atualização | Linux → Windows | 0.4.6 → 0.9.2-win | `atualizar.sh` no Linux; `atualizar.cmd` e `atualizar.ps1` no Windows, com `-Verificar` e `-Forcar`. No Windows roda do clone (não há `.origem`), e a cópia instalada não é usada. O Windows confere a versão instalada depois, porque o instalador elevado roda em outra janela |

@@ -22,7 +22,9 @@ from .sampler import Context
 log = logging.getLogger(__name__)
 WEB = ROOT / "web"
 COOKIE = "sm_session"
-PUBLIC = {"/login", "/setup", "/manifest.webmanifest", "/icon.svg", "/css/app.css"}
+FONT = "/fonts/archivo.woff2"
+# /api/webhook/notify não usa a sessão: a rota confere o token dela
+PUBLIC = {"/login", "/setup", "/manifest.webmanifest", "/icon.svg", "/css/app.css", FONT, "/api/webhook/notify"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -119,7 +121,7 @@ class Handler(BaseHTTPRequestHandler):
         path = url.path
 
         auth_on = self.ctx.config.auth_enabled
-        if auth_on and not self.auth.has_password() and path not in ("/setup", "/css/app.css", "/icon.svg"):
+        if auth_on and not self.auth.has_password() and path not in ("/setup", "/css/app.css", "/icon.svg", FONT, "/api/webhook/notify"):
             return self._redirect("/setup") if not path.startswith("/api/") else \
                 self._json({"error": "senha ainda não cadastrada"}, 401)
 
@@ -281,7 +283,9 @@ class Handler(BaseHTTPRequestHandler):
             ctype = "application/manifest+json"
         if ctype.startswith("text/") or ctype.endswith(("json", "javascript", "svg+xml")):
             ctype += "; charset=utf-8"
-        self._send(200, target.read_bytes(), ctype)
+        # a fonte não muda entre versões; o resto continua sem cache para a atualização valer na hora
+        headers = {"Cache-Control": "public, max-age=2592000"} if target.suffix == ".woff2" else None
+        self._send(200, target.read_bytes(), ctype, headers)
 
     def _stream(self) -> None:
         """Server-Sent Events: um snapshot a cada amostra."""
@@ -309,6 +313,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class Server(ThreadingHTTPServer):
+    request_queue_size = 128     # o padrão (5) recusa conexões quando a página pede vários arquivos de uma vez
     daemon_threads = True
     allow_reuse_address = True
 

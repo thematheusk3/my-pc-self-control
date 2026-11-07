@@ -1,0 +1,120 @@
+/* Estilos do painel: mudam a forma (fundo, cartões, medidores, gráficos) e funcionam com qualquer cor e nos temas claro e
+   escuro. "Placa" é o padrão de app.css e não precisa de regra aqui. Tudo parte dos tokens, para valer em todas as abas. */
+
+/* ---------- Vidro: painéis translúcidos sobre um fundo da cor escolhida (desenhado em theme.js) ---------- */
+#style-bg { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; }
+
+:root[data-style="vidro"] {
+  --r-s: 8px; --r-m: 14px; --r-l: 22px; --gap: 14px;
+  --glass: color-mix(in srgb, var(--surface-1) 60%, transparent);
+  --glass-rail: color-mix(in srgb, var(--rail) 58%, transparent);
+  --glass-line: color-mix(in srgb, var(--text-primary) 13%, transparent);
+}
+:root[data-style="vidro"][data-theme="light"] { --glass: color-mix(in srgb, var(--surface-1) 78%, transparent); }
+@media (prefers-color-scheme: light) {
+  :root[data-style="vidro"]:not([data-theme="dark"]) { --glass: color-mix(in srgb, var(--surface-1) 78%, transparent); }
+}
+[data-style="vidro"] body { background: transparent; }
+[data-style="vidro"] .card, [data-style="vidro"] .vitals {
+  background: var(--glass); border-color: var(--glass-line);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow: 0 12px 34px rgb(0 0 0 / .16), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+/* no celular a barra de abas fica dentro do cabeçalho e é fixa: desfoque nele a prenderia ao cabeçalho */
+[data-style="vidro"] .tabs {
+  background: var(--glass-rail); border-color: var(--glass-line);
+  -webkit-backdrop-filter: blur(26px) saturate(1.5); backdrop-filter: blur(26px) saturate(1.5);
+}
+@media (min-width: 1024px) {
+  [data-style="vidro"] .topbar {
+    background: var(--glass-rail); border-color: var(--glass-line);
+    -webkit-backdrop-filter: blur(26px) saturate(1.5); backdrop-filter: blur(26px) saturate(1.5);
+  }
+  [data-style="vidro"] .tabs { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  [data-style="vidro"] .tab[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+  [data-style="vidro"] .tab[aria-current="page"]::before { display: none; }
+  [data-style="vidro"] .tab:hover:not([aria-current="page"]) { background: var(--glass-line); }
+}
+/* medidores contínuos no lugar dos LEDs */
+[data-style="vidro"] .meter { -webkit-mask: none; mask: none; height: 8px; border-radius: 999px; background: var(--glass-line); }
+[data-style="vidro"] .meter > i { border-radius: 999px; }
+[data-style="vidro"] .cores { -webkit-mask: none; mask: none; gap: clamp(3px, .5vw, 6px); }
+[data-style="vidro"] .core { border-radius: 6px; background: var(--glass-line); }
+[data-style="vidro"] .chip { border-radius: 999px; background: var(--glass-line); padding-inline: 9px; }
+[data-style="vidro"] .chip::before { border-radius: 50%; }
+[data-style="vidro"] .btn, [data-style="vidro"] .seg { border-radius: 999px; }
+[data-style="vidro"] .seg button { border-radius: 999px; }
+@media (prefers-reduced-transparency: reduce) {
+  [data-style="vidro"] .card, [data-style="vidro"] .vitals { background: var(--surface-1); }
+  [data-style="vidro"] .topbar, [data-style="vidro"] .tabs { background: var(--rail); }
+}
+
+/* ---------- Osciloscópio: tela de instrumento; no tema claro, papel de registrador, sem brilho ---------- */
+:root[data-style="osc"] {
+  --r-s: 0px; --r-m: 2px; --r-l: 2px; --gap: 10px;
+  --osc-grid: color-mix(in srgb, var(--series-1) 16%, transparent);
+  --osc-tick: color-mix(in srgb, var(--series-1) 62%, transparent);
+  --osc-glow: drop-shadow(0 0 5px color-mix(in srgb, var(--series-1) 75%, transparent));
+  --osc-text: 0 0 18px color-mix(in srgb, var(--series-1) 45%, transparent);
+  --cores-h: 92px;
+}
+:root[data-style="osc"][data-theme="light"] { --osc-glow: none; --osc-text: none; }
+@media (prefers-color-scheme: light) {
+  :root[data-style="osc"]:not([data-theme="dark"]) { --osc-glow: none; --osc-text: none; }
+}
+[data-style="osc"] .card {
+  --t: var(--osc-tick);
+  background:   /* marcas de canto, como o enquadramento da tela */
+    linear-gradient(var(--t), var(--t)) 0 0 / 12px 1px, linear-gradient(var(--t), var(--t)) 0 0 / 1px 12px,
+    linear-gradient(var(--t), var(--t)) 100% 0 / 12px 1px, linear-gradient(var(--t), var(--t)) 100% 0 / 1px 12px,
+    linear-gradient(var(--t), var(--t)) 0 100% / 12px 1px, linear-gradient(var(--t), var(--t)) 0 100% / 1px 12px,
+    linear-gradient(var(--t), var(--t)) 100% 100% / 12px 1px, linear-gradient(var(--t), var(--t)) 100% 100% / 1px 12px,
+    var(--surface-1);
+  background-repeat: no-repeat;
+}
+[data-style="osc"] .spark {
+  height: 104px; border: 1px solid var(--osc-grid); background-color: var(--bg);
+  background-image: linear-gradient(to right, var(--osc-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--osc-grid) 1px, transparent 1px);
+  background-size: 10% 25%;
+}
+[data-style="osc"] .spark canvas { filter: var(--osc-glow); }
+[data-style="osc"] main .card-title, [data-style="osc"] main .hero, [data-style="osc"] main .stat-value, [data-style="osc"] .vitals h1,
+[data-style="osc"] main .chip { font-family: var(--mono); font-stretch: 100%; }
+[data-style="osc"] main .stats { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }   /* a fonte de instrumento é mais larga */
+[data-style="osc"] main .hero { font-size: 46px; font-weight: 500; letter-spacing: -.03em; text-shadow: var(--osc-text); }
+[data-style="osc"] main .hero small { font-size: 18px; }
+[data-style="osc"] main .card-title { font-size: 14px; }
+[data-style="osc"] main .stat-value { font-size: 15px; font-weight: 500; letter-spacing: -.02em; }
+[data-style="osc"] .vitals {
+  background-color: var(--bg); border-color: var(--osc-tick);
+  background-image: linear-gradient(to right, var(--osc-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--osc-grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+[data-style="osc"] .vitals h1 { font-size: clamp(26px, 3.2vw, 36px); font-weight: 500; letter-spacing: -.03em; text-shadow: var(--osc-text); }
+[data-style="osc"] .vitals-state.good { --c: var(--series-1); }
+[data-style="osc"] .cores { filter: var(--osc-glow); -webkit-mask-image: none; mask-image: none; gap: clamp(3px, .6vw, 8px); }
+[data-style="osc"] .core { background: var(--osc-grid); }
+@media (min-width: 1024px) {
+  [data-style="osc"] .tab { font-family: var(--mono); font-stretch: 100%; }
+  [data-style="osc"] .tab[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+  [data-style="osc"] .tab[aria-current="page"]::before { display: none; }
+}
+
+/* ---------- escolha na janela Aparência ---------- */
+.appearance-label { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.look-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.look-tile { display: grid; gap: 6px; padding: 6px 6px 8px; border: 2px solid var(--border); border-radius: var(--r-m); background: none; color: var(--text-primary); font: inherit; font-size: 13px; text-align: center; cursor: pointer; }
+.look-tile:hover { border-color: var(--text-muted); }
+.look-tile[aria-pressed="true"] { border-color: var(--accent); font-weight: 650; }
+/* cada amostra desenha o traço do estilo, para escolher sem precisar ler */
+.look-demo { display: block; height: 54px; overflow: hidden; background-color: var(--bg); }
+.look-demo.placa { background-image: repeating-linear-gradient(to right, var(--series-1) 0 5px, transparent 5px 8px); background-size: 66% 10px; background-position: 12% 50%; background-repeat: no-repeat; }
+.look-demo.vidro {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--accent) 60%, transparent), color-mix(in srgb, var(--series-1) 60%, transparent));
+  box-shadow: inset 0 0 0 9px transparent; border-radius: 10px;
+}
+.look-demo.vidro::after { content: ""; display: block; margin: 12px 16px; height: 30px; border-radius: 8px; background: rgb(255 255 255 / .28); border: 1px solid rgb(255 255 255 / .4); }
+.look-demo.osc {
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--series-1) 45%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--series-1) 45%, transparent) 1px, transparent 1px);
+  background-size: 14px 14px;
+}

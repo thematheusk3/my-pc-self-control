@@ -1,6 +1,8 @@
 // Núcleo: conexão em tempo real (SSE), histórico local, roteamento de abas.
 import { $, h, toast } from "./ui.js";
 import { MODULES } from "./modules/index.js";
+import { ic } from "./icons.js";
+import { setupAppearance } from "./theme.js";
 
 const HISTORY_WINDOW = 300; // segundos
 
@@ -118,16 +120,24 @@ function watchdog() {
 }
 
 function setupTheme() {
-  const saved = localStorage.getItem("theme");
-  if (saved) document.documentElement.dataset.theme = saved;
-  $("#theme-btn").addEventListener("click", () => {
-    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-    const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
-    const next = cur === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem("theme", next);
-    if (app.snapshot) app.pushSnapshot(app.snapshot); // redesenha canvases
-  });
+  $("#theme-btn").innerHTML = ic("circle-half");
+  $(".bell-ico").innerHTML = ic("bell");
+  setupAppearance(app);
+}
+
+// No celular cabem 4 abas + "Mais"; as demais abrem acima da barra. No PC a barra lateral mostra todas.
+const MOBILE_TABS = 4;
+function setupMoreTab(tabs, mods) {
+  tabs.style.setProperty("--cols", Math.min(mods.length, MOBILE_TABS + 1));
+  if (mods.length <= MOBILE_TABS + 1) return () => {};
+  tabs.classList.add("has-more");
+  const more = h(`<button class="tab tab-more" aria-expanded="false"><span class="ico" aria-hidden="true">${ic("dots-three")}</span><span>Mais</span></button>`);
+  tabs.append(more);
+  const set = open => { tabs.classList.toggle("open", open); more.setAttribute("aria-expanded", open); };
+  more.addEventListener("click", () => set(!tabs.classList.contains("open")));
+  document.addEventListener("keydown", e => { if (e.key === "Escape") set(false); });
+  document.addEventListener("click", e => { if (!tabs.contains(e.target)) set(false); });
+  return inMore => { set(false); more.classList.toggle("holds-current", inMore); };
 }
 
 function setupRouter() {
@@ -141,6 +151,7 @@ function setupRouter() {
     views.append(view);
     m.mount(view, app);
   }
+  const closeMore = setupMoreTab(tabs, mods);
   const go = () => {
     const [id, sub] = (location.hash.slice(1) || mods[0].id).split(":");   // ex.: #processes:susp
     const mod = mods.find(m => m.id === id) || mods[0];
@@ -148,6 +159,7 @@ function setupRouter() {
       if (b.dataset.id === mod.id) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
     }
+    closeMore(mods.indexOf(mod) >= MOBILE_TABS);
     for (const v of views.children) v.classList.toggle("active", v.id === `view-${mod.id}`);
     if (app.current !== mod) { app.current?.hide?.(); app.current = mod; mod.route?.(sub); mod.show?.(); }
     else mod.route?.(sub, true);

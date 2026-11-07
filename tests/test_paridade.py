@@ -1,4 +1,4 @@
-"""Recursos trazidos da versão Windows (0.4.7): monitor, engines da GPU, processos críticos, finalizar
+"""Recursos trazidos da versão Windows (0.4.7 e 0.5.0): monitor, engines da GPU, processos críticos, finalizar
 educado, PID reaproveitado, reinício pendente e integridade do executável."""
 import os
 import signal
@@ -201,6 +201,63 @@ class PackageIntegrityTest(unittest.TestCase):
     def test_mtree_unescape_and_glob(self):
         self.assertEqual(procinspect._mtree_unescape(r"./usr/bin/a\040b"), "./usr/bin/a b")
         self.assertEqual(procinspect.glob_escape("gtk[3]"), "gtk[[]3]")
+
+
+class NotGameTest(unittest.TestCase):
+    """Apps que não são jogos (0.9.1-win), com o jogo vindo da Steam ou do MangoHud."""
+
+    def setUp(self):
+        from sm import game
+        from tests.helpers import Ctx
+        self.game = game
+        self._orig = game.STATE_FILE
+        game.STATE_FILE = Path(tempfile.mkdtemp()) / "game.json"
+        self.ctx = Ctx()
+        self.ctx.processes, self.ctx.data = [], {}
+        self.g = game.GameMonitor(self.ctx)
+
+    def tearDown(self):
+        self.game.STATE_FILE = self._orig
+
+    def _mangohud(self, name):
+        with self.g.lock:
+            self.g.file = Path(f"/tmp/{name}_2026-11-07_10-00-00.csv")
+            self.g.last_write = time.time()
+            self.g.samples.append((time.time(), 60.0, 16.6))
+
+    def test_mangohud_app_marked_and_kept(self):
+        self._mangohud("Wallpaper")
+        st = self.g.status()
+        key = st["game"]["key"]
+        self.assertEqual(key, "exe:wallpaper")
+        self.assertEqual(st["recent_games"], [{"key": key, "name": "Wallpaper"}])
+        st = self.g.set_not_game(key, "Wallpaper", True)
+        self.assertIsNone(st["game"])
+        self.assertIsNone(st["fps"])
+        self.assertFalse(st["live"])
+        self.assertEqual(st["recent_games"], [])
+        self.g.enabled = True
+        self.g._save()                             # gravar o FPS não apaga a lista
+        again = self.game.GameMonitor(self.ctx)
+        self.assertEqual(again.not_games, {key: "Wallpaper"})
+        self.assertEqual(self.g.set_not_game(key, None, False)["game"]["key"], key)
+
+    def test_steam_app(self):
+        self.ctx.processes = [{"pid": 10, "cmd": "reaper SteamLaunch AppId=431960 -- x", "create_time": 1.0}]
+        st = self.g.status()
+        self.assertEqual(st["game"]["key"], "steam:431960")
+        self.assertEqual(st["game"]["pid"], 10)
+        self.assertIsNone(self.g.set_not_game("steam:431960", "Wallpaper Engine", True)["game"])
+
+    def test_invalid_key_and_limit(self):
+        for key in (None, "", "exe:../x", "qualquer"):
+            with self.assertRaises(ValueError):
+                self.g.set_not_game(key, "x", True)
+        for i in range(self.game.MAX_RECENT + 3):
+            self._mangohud(f"App{i}")
+            st = self.g.status()
+        self.assertEqual(len(st["recent_games"]), self.game.MAX_RECENT)
+        self.assertEqual(st["recent_games"][0]["key"], f"exe:app{self.game.MAX_RECENT + 2}")
 
 
 if __name__ == "__main__":

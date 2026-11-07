@@ -1,4 +1,5 @@
 // Mídia (MPRIS): utilidades compartilhadas pela Visão geral ("No PC agora") e por Controles > Áudio.
+import { ic } from "./icons.js";
 import { esc } from "./ui.js";
 
 export const STATUS = { playing: ["good", "Tocando"], paused: ["", "Pausado"], stopped: ["", "Parado"] };
@@ -18,16 +19,16 @@ export function livePos(p, ts) {
   return Math.min(p.length, (p.position || 0) + (p.status === "playing" ? Math.max(0, ts - p.at) * (p.rate || 1) : 0));
 }
 
-/** Botões ⏮ ⏯ ⏭ (e ±10 s com seek=true). Os cliques vão para controlMedia(). */
+/** Botões anterior, tocar/pausar, próxima (e ±10 s com seek=true). Os cliques vão para controlMedia(). */
 export function mediaButtons(p, { seek = false } = {}) {
   const pid = esc(p.id), playing = p.status === "playing";
   const b = (op, ico, title, extra = "") => `<button class="btn btn-sm" data-op="${op}" data-player="${pid}" ${extra} title="${title}" aria-label="${title}">${ico}</button>`;
   return [
-    p.can.previous && b("previous", "⏮", "Anterior"),
+    p.can.previous && b("previous", ic("skip-back"), "Anterior"),
     seek && p.can.seek && b("seek", "−10s", "Voltar 10 s", `data-offset="-10"`),
-    p.can.play_pause && b("play_pause", playing ? "⏸" : "▶", playing ? "Pausar" : "Tocar"),
+    p.can.play_pause && b("play_pause", ic(playing ? "pause" : "play"), playing ? "Pausar" : "Tocar"),
     seek && p.can.seek && b("seek", "+10s", "Avançar 10 s", `data-offset="10"`),
-    p.can.next && b("next", "⏭", "Próxima"),
+    p.can.next && b("next", ic("skip-forward"), "Próxima"),
   ].filter(Boolean).join("");
 }
 

@@ -1,3 +1,4 @@
+import { ic } from "../icons.js";
 import { $, esc, statusChip } from "../ui.js";
 
 let app, root;
@@ -19,7 +20,7 @@ function update(snap) {
   const chips = snap.data.sensors?.chips || [];
   const grid = $("[data-grid]", root);
   if (!chips.length) { grid.innerHTML = `<div class="card empty span-all">Nenhum sensor hwmon encontrado. Instale <code>lm_sensors</code> e rode <code>sensors-detect</code>.</div>`; return; }
-  const hint = snap.data.sensors.fan_hint ? `<div class="card span-all"><p class="note" style="margin:0">⚠ ${snap.data.sensors.fan_hint}</p></div>` : "";
+  const hint = snap.data.sensors.fan_hint ? `<div class="card span-all"><p class="note" style="margin:0">${ic("warning")} ${snap.data.sensors.fan_hint}</p></div>` : "";
   grid.innerHTML = hint + chips.map(c => {
     const groups = {};
     for (const r of c.readings) (groups[r.kind] ||= []).push(r);
@@ -31,4 +32,4 @@ function update(snap) {
   }).join("");
 }
 
-export default { id: "sensors", title: "Sensores", icon: "🌡", mount, show: () => app.snapshot && update(app.snapshot) };
+export default { id: "sensors", title: "Sensores", icon: ic("thermometer"), mount, show: () => app.snapshot && update(app.snapshot) };

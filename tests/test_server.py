@@ -48,3 +48,11 @@ class KeepAliveTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StaticAssetsTest(unittest.TestCase):
+    def test_font_is_reachable_before_login(self):
+        """A tela de login usa a fonte do painel: sem sessão ela precisa carregar, e o arquivo precisa existir."""
+        from sm.server import FONT, PUBLIC, WEB
+        self.assertIn(FONT, PUBLIC)
+        self.assertTrue((WEB / FONT.lstrip("/")).is_file())
