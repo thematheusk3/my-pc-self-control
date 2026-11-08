@@ -97,7 +97,7 @@ function paint() {
   $("[data-log-link]", root).href = data.changelog_url;
   $("[data-log]", root).innerHTML = data.changelog.map(e => `
     <details class="release" ${e.new || e.installed ? "open" : ""}>
-      <summary><span class="release-v">${esc(e.version)}</span>
+      <summary><span class="release-v">${esc(e.version)}</span>${e.date ? ` <span class="release-d">${esc(e.date.split("-").reverse().join("/"))}</span>` : ""}
         ${e.new ? `<span class="chip warning">Nova</span>` : e.installed ? `<span class="chip good">Instalada</span>` : ""}</summary>
       <ul>${e.items.map(i => `<li>${inline(i)}</li>`).join("")}</ul>
     </details>`).join("") || `<p class="muted">Changelog indisponível. Veja no GitHub.</p>`;

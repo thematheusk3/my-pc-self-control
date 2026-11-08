@@ -1,13 +1,13 @@
 # Changelog
 
-## 0.5.2
+## 0.5.2 — 2026-11-08
 - Jogo atual: corrigido o "App 35931" de atalhos não-Steam. O comando dos processos vem cortado em 300 caracteres e o corte
   partia o AppId ao meio; agora o AppId é lido do `/proc/<pid>/cmdline` completo.
 - O GOverlay reescreve o `MangoHud.conf` inteiro ao abrir/salvar e apagava o bloco da leitura de FPS: o painel confere o
   arquivo a cada 10 s e recoloca o bloco. A aba MangoHud avisa quando o GOverlay está aberto (ele sobrescreve o que for
   mudado pela página) e esconde o botão de abri-lo.
 
-## 0.5.1
+## 0.5.1 — 2026-11-08
 - **Aba MangoHud**: ajusta o `MangoHud.conf` (o mesmo arquivo do GOverlay) pelo celular e o HUD do jogo aberto muda na hora
   (o MangoHud recarrega o arquivo sozinho). Posição, fonte, opacidade, cores, colunas, métricas, limite de FPS, VSync,
   atalhos, esconder o HUD, desfazer, editor do arquivo inteiro, configs por jogo (`wine-<exe>.conf`) e botão para abrir o
@@ -16,7 +16,7 @@
   "App 3593100922". Se o executável está na pasta de um jogo da Steam instalado, vira esse jogo (nome e arte do Mural);
   senão, usa o nome do atalho (`shortcuts.vdf`) ou do executável. O caminho completo vem do `/proc/<pid>/cmdline`.
 
-## 0.5.0
+## 0.5.0 — 2026-11-07
 Trazido da versão Windows (0.6.0-win a 0.11.1-win), na ordem do [PARIDADE.md](PARIDADE.md):
 - **Interface repaginada**: tema "placa do PC", faixa de estado ("Tudo normal" ou o que precisa de atenção) com o uso de cada
   thread, barra lateral no PC e barra inferior com "Mais" no celular, ícones SVG (Phosphor) e fonte própria (Archivo).
@@ -34,7 +34,7 @@ Trazido da versão Windows (0.6.0-win a 0.11.1-win), na ordem do [PARIDADE.md](P
 - Servidor aceita rajadas de pedidos (`request_queue_size = 128`): a página nova pede vários arquivos de uma vez.
 - Notificações de webhook na tela do PC sem o "⚠" quando não são críticas.
 
-## 0.4.7
+## 0.4.7 — 2026-11-07
 Trazido da versão Windows (tudo da seção 1 do [PARIDADE.md](PARIDADE.md) que se aplica ao Linux):
 - Controles > Tela: cada monitor aparece com o **nome real** (EDID, ex.: "LG ULTRAGEAR (DP-4)"), o **tipo de conexão**
   (DisplayPort, HDMI, tela embutida), a **escala em %** e o chip **principal**.
@@ -56,13 +56,13 @@ Trazido da versão Windows (tudo da seção 1 do [PARIDADE.md](PARIDADE.md) que 
   `pacman`, `md5sums` do `dpkg` ou `rpm --dump`); se foi alterado, vira sinal **alto** com o comando para reinstalar.
   É o equivalente Linux à verificação de assinatura digital do Windows.
 
-## 0.4.6
+## 0.4.6 — 2026-11-02
 - `./atualizar.sh`: baixa a versão nova do GitHub, lista o que mudou e reinstala do mesmo jeito que o serviço já
   está (root ou seu usuário); `--verificar` só consulta, `--forcar` reinstala mesmo sem versão nova. Funciona também
   pela cópia instalada (`/opt/applications/self-monitoring/atualizar.sh`): o instalador anota a pasta de origem.
 - [ATUALIZAR.md](ATUALIZAR.md): como atualizar, conferir a versão, resolver problemas e voltar à versão anterior.
 
-## 0.4.5
+## 0.4.5 — 2026-11-02
 Trazido da versão Windows (0.5.2-win e 0.5.3-win):
 - Sistema > **Quem está acessando**: sessões abertas com aparelho, IP, origem (este PC, rede local, VPN, internet),
   nome na rede (DNS reverso) e MAC (tabela ARP do kernel), última atividade e botão para encerrar a sessão de outro
@@ -76,7 +76,7 @@ Trazido da versão Windows (0.5.2-win e 0.5.3-win):
   viram uma linha. Filtros por categoria e por aparelho; "Ver ações" em cada sessão (`data/audit-log.json`).
 - API: `GET /api/auth/sessions`, `POST /api/auth/sessions/end`, `GET /api/audit`.
 
-## 0.4.4
+## 0.4.4 — 2026-11-02
 - **Serviço como root** (`install.sh --root`): sessão, áudio, tela, captura, mídia, janela em foco e abrir apps
   não funcionavam ("Ninguém está logado", "Servidor de áudio indisponível", `kscreen-doctor: -6`), porque o painel
   procurava a sessão do próprio root. Agora esses comandos rodam como o dono da área de trabalho (gravado pelo
@@ -89,22 +89,22 @@ Trazido da versão Windows (0.5.2-win e 0.5.3-win):
 - `tools/diagnostico.sh`: coleta, sem mudar nada, o que é preciso para entender sessão, áudio, tela e ventoinhas.
 - `PARIDADE.md`: o que dá para levar entre as versões Linux e Windows (mesmo arquivo nos dois repositórios).
 
-## 0.4.3
+## 0.4.3 — 2026-11-02
 - Controles > Áudio: novo cartão **Mídia** no topo, com todos os players abertos (Spotify, navegador, VLC...):
   capa, faixa, progresso e ⏮ ⏯ ⏭, mais **voltar/avançar 10 s** quando o player permite.
 - Controles > Áudio: no celular o menu de saída de cada app passava da borda da tela; agora desce para a linha de baixo.
 - API: `POST /api/media` aceita `{"op": "seek", "offset": -10}` (segundos).
 - README: seção "Sistemas suportados" (feito para o CachyOS; Windows talvez no futuro).
 
-## 0.4.2
+## 0.4.2 — 2026-11-02
 - Captura de tela: ao capturar, a imagem abre na hora por cima do painel (com "Tamanho real" e "Baixar").
 
-## 0.4.1
+## 0.4.1 — 2026-11-02
 - Correção: depois de tirar uma captura, a lista falhava com 501 `Unsupported method ('{}GET')` até dar F5.
   O servidor não lia o corpo de POSTs cujas rotas não o usam (captura, apagar captura, logout); com keep-alive
   o corpo ficava na conexão e corrompia o pedido seguinte. Agora o corpo é sempre lido antes da rota.
 
-## 0.4.0
+## 0.4.0 — 2026-11-02
 - Topo: horário da última atualização; "Offline · HH:MM:SS há X" quando os dados param de chegar
   (e reconecta sozinho quando o celular acorda ou a conexão trava sem erro).
 - Captura de tela: a imagem aparece na hora, sem F5 (o painel esperava só o arquivo existir e servia o PNG
@@ -113,7 +113,7 @@ Trazido da versão Windows (0.5.2-win e 0.5.3-win):
 - Visão geral > Downloads Steam: progresso, velocidade e tempo restante de downloads e atualizações.
 - Topo: abas rolam em telas médias em vez de sobrepor o nome do PC.
 
-## 0.3.0
+## 0.3.0 — 2026-11-01
 - Jogo atual e FPS (MangoHud): FPS, 1% low, frametime; leitura liga/desliga (desligada não custa nada).
 - Controles > Áudio: saída padrão (fone/HDMI...), volume e mudo por dispositivo, áudio por aplicativo
   (volume, mudo e por qual saída sai), microfone (mudo, volume, quem está usando).
@@ -125,7 +125,7 @@ Trazido da versão Windows (0.5.2-win e 0.5.3-win):
   login no painel, senha errada, atualizações, FPS baixo); avisos no painel, na tela do PC e no celular (ntfy).
 - Sistema: atualizações pendentes (pacman, AUR, flatpak, apt, dnf), destacando kernel e drivers.
 
-## 0.2.0
+## 0.2.0 — 2026-11-01
 - Ventoinha: controle automático (curva com histerese), manual e devolução à placa; detecção automática do canal.
 - Processos: histórico de encerrados, análise (pacote, hash, VirusTotal, cadeia de pais, conexões) e lista de suspeitos.
 - Rede: conexões por programa, bytes enviados/recebidos, conexões encerradas e portas abertas.

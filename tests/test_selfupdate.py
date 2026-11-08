@@ -45,6 +45,10 @@ class ChangelogTest(unittest.TestCase):
         self.assertEqual(e[0]["items"], ["Primeiro tópico, que continua aqui.", "Segundo com **negrito**."])
         self.assertEqual(e[1]["items"], ["Parágrafo sem tópico.", "Tópico."])
 
+    def test_changelog_date(self):
+        e = parse_changelog("# Changelog\n\n## 1.2.0 — 2026-11-08\n- a\n\n## 1.1.0\n- b\n")
+        self.assertEqual([(x["version"], x["date"]) for x in e], [("1.2.0", "2026-11-08"), ("1.1.0", None)])
+
     def test_real_changelog_has_installed_version(self):
         e = parse_changelog(selfupdate.CHANGELOG.read_text(encoding="utf-8"))
         self.assertEqual(e[0]["version"], selfupdate.__version__, "CHANGELOG.md sem a versão atual")

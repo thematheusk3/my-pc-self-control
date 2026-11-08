@@ -49,7 +49,7 @@ def remote_version(init_py: str) -> str | None:
 
 
 def parse_changelog(text: str) -> list[dict]:
-    """CHANGELOG.md -> [{version, items}]. Cada item junta as linhas de um tópico ou parágrafo."""
+    """CHANGELOG.md -> [{version, date, items}]. Cada item junta as linhas de um tópico ou parágrafo."""
     out: list[dict] = []
     item: str | None = None
 
@@ -62,7 +62,9 @@ def parse_changelog(text: str) -> list[dict]:
     for line in text.splitlines():
         if line.startswith("## "):
             flush()
-            out.append({"version": line[3:].strip(), "items": []})
+            # "## 0.5.2 — 2026-11-08": a data é opcional
+            m = re.match(r"(\S+)(?:\s+[—–-]\s+(\d{4}-\d{2}-\d{2}))?", line[3:].strip())
+            out.append({"version": m.group(1) if m else line[3:].strip(), "date": m.group(2) if m else None, "items": []})
         elif not out or line.startswith("# "):
             continue
         elif line.startswith("- "):

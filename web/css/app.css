@@ -601,6 +601,7 @@ body.login-page { display: grid; place-items: center; min-height: 100dvh; paddin
 .release summary::before { content: "▸"; color: var(--text-muted); }
 .release[open] summary::before { content: "▾"; }
 .release-v { font-weight: 650; font-variant-numeric: tabular-nums; }
+.release-d { font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .release ul { margin: 0 0 12px; padding-left: 20px; max-width: 86ch; color: var(--text-secondary); }
 .release li + li { margin-top: 6px; }
 
