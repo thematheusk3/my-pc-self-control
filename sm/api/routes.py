@@ -19,7 +19,7 @@ def info(req):
                      "unlock": ctx.config.allow_unlock, "launch": ctx.config.allow_launch,
                      "screenshot": ctx.config.allow_screenshot, "control": ctx.config.allow_control,
                      "alerts": ctx.alerts is not None, "updates": ctx.updates is not None,
-                     "media": ctx.media is not None},
+                     "media": ctx.media is not None, "mangohud": _mangohud_installed()},
         "sample_interval": ctx.config.sample_interval,
         "process_interval": ctx.config.process_interval,
         "info": ctx.info(),
@@ -377,6 +377,35 @@ def game_not_game(req):
         return req.ctx.game.set_not_game(b.get("key"), b.get("name"), b.get("ignored", True) is not False)
     except ValueError as e:
         return Response({"error": str(e)}, 400)
+
+
+# ---------- MangoHud (configuração ao vivo) ----------
+def _mangohud_installed() -> bool:
+    from ..mangohud import installed
+    return installed()
+
+
+@route("GET", "/api/mangohud")
+def mangohud_state(req):
+    from ..mangohud import ConfError, state
+    try:
+        return state(req.query.get("file", [None])[0])
+    except ConfError as e:
+        return Response({"error": str(e)}, 400)
+
+
+@route("POST", "/api/mangohud")
+def mangohud_update(req):
+    from ..mangohud import ConfError, apply, save_text
+    b = req.json() or {}
+    try:
+        if "text" in b:
+            return save_text(b.get("file"), b["text"])
+        return apply(b.get("file"), b.get("set"))
+    except ConfError as e:
+        return Response({"error": str(e)}, 400)
+    except RuntimeError as e:
+        return Response({"error": str(e)}, 500)
 
 
 # ---------- áudio ----------

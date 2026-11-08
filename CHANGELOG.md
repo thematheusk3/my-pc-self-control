@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1
+- **Aba MangoHud**: ajusta o `MangoHud.conf` (o mesmo arquivo do GOverlay) pelo celular e o HUD do jogo aberto muda na hora
+  (o MangoHud recarrega o arquivo sozinho). Posição, fonte, opacidade, cores, colunas, métricas, limite de FPS, VSync,
+  atalhos, esconder o HUD, desfazer, editor do arquivo inteiro, configs por jogo (`wine-<exe>.conf`) e botão para abrir o
+  GOverlay no PC. O bloco da leitura de FPS do painel é preservado e linhas `exec` (rodam comandos) não podem ser alteradas.
+- Jogo atual: atalhos de **jogos não-Steam** (ex.: launcher do Seamless Coop do Elden Ring) não aparecem mais como
+  "App 3593100922". Se o executável está na pasta de um jogo da Steam instalado, vira esse jogo (nome e arte do Mural);
+  senão, usa o nome do atalho (`shortcuts.vdf`) ou do executável. O caminho completo vem do `/proc/<pid>/cmdline`.
+
 ## 0.5.0
 Trazido da versão Windows (0.6.0-win a 0.11.1-win), na ordem do [PARIDADE.md](PARIDADE.md):
 - **Interface repaginada**: tema "placa do PC", faixa de estado ("Tudo normal" ou o que precisa de atenção) com o uso de cada

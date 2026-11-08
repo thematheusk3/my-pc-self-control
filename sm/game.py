@@ -163,9 +163,11 @@ class GameMonitor:
             cmd = p.get("cmd") or ""
             m = re.search(r"SteamLaunch AppId=(\d+)", cmd)
             if m and m.group(1) != "0":
-                appid = m.group(1)
-                return {"appid": appid, "name": steam_name(appid) or f"App {appid}", "since": p.get("create_time"),
-                        "source": "steam", "pid": p.get("pid")}
+                appid, name, exe = resolve_launch(m.group(1), p.get("pid"), p.get("create_time"), cmd)
+                game = {"appid": appid, "name": name, "since": p.get("create_time"), "source": "steam", "pid": p.get("pid")}
+                if exe:
+                    game["exe"] = exe
+                return game
         return None
 
     # ---------- leitura do CSV ----------
@@ -282,6 +284,131 @@ def game_key(game: dict) -> str:
 
 
 _names: dict[str, str | None] = {}
+_launches: dict[tuple, tuple] = {}
+RX_COMMON = re.compile(r"steamapps/common/([^/\x00]+)/")
+
+
+def resolve_launch(appid: str, pid, create_time, cmd: str) -> tuple[str | None, str, str | None]:
+    """AppId do 'reaper SteamLaunch' -> (appid da Steam ou None, nome, exe).
+
+    Jogo da Steam: o nome vem do appmanifest. Atalho de jogo não-Steam (ex.: launcher de mod,
+    como o Seamless Coop do Elden Ring), o AppId é um número gerado que não tem manifest:
+      1. se o executável está dentro de steamapps/common/<pasta> de um jogo instalado, usa esse
+         jogo (nome e arte certos);
+      2. senão, o nome que o usuário deu ao atalho (userdata/*/config/shortcuts.vdf);
+      3. senão, o nome do executável.
+    Atalhos se reconhecem pelo AppId >= 2^31 (a Steam liga o bit mais alto)."""
+    name = steam_name(appid)
+    if name or int(appid) < 2 ** 31:      # AppIds de atalhos não-Steam têm o bit mais alto ligado
+        return appid, name or f"App {appid}", None
+    key = (pid, create_time)
+    if key not in _launches:
+        full = _full_cmdline(pid) or cmd     # o cmd da lista de processos vem cortado
+        real = None
+        for d in reversed(RX_COMMON.findall(full)):     # o jogo vem depois do runtime e do Proton
+            real = _installdir_appid(d)
+            if real:
+                break
+        if real:
+            res = (real, steam_name(real) or d, None)
+        else:
+            short = steam_shortcuts().get(appid)
+            exe = _exe_name(full)
+            res = (None, short or exe or f"App {appid}", short or exe or f"app-{appid}")
+        if len(_launches) > 32:
+            _launches.clear()
+        _launches[key] = res
+    return _launches[key]
+
+
+def _full_cmdline(pid) -> str | None:
+    try:
+        raw = Path(f"/proc/{int(pid)}/cmdline").read_bytes()[:16384]
+    except (OSError, TypeError, ValueError):
+        return None
+    return raw.replace(b"\0", b" ").decode(errors="replace").strip() or None
+
+
+def _exe_name(cmd: str) -> str | None:
+    exes = re.findall(r"([^/\\\s\"']+)\.exe\b", cmd, re.I)
+    exes = [e for e in exes if e.lower() not in ("steam", "proton")]
+    return exes[-1] if exes else None
+
+
+def _installdir_appid(folder: str) -> str | None:
+    for root in STEAM_ROOTS:
+        for lib in _libraries(root):
+            for acf in (lib / "steamapps").glob("appmanifest_*.acf"):
+                try:
+                    text = acf.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                m = re.search(r'"installdir"\s+"([^"]+)"', text)
+                n = re.search(r'"name"\s+"([^"]+)"', text)
+                if m and m.group(1) == folder and not (n and NOT_GAME_NAMES.search(n.group(1))):
+                    return acf.stem.split("_", 1)[1]
+    return None
+
+
+_shortcuts_cache: tuple[tuple, dict] = ((), {})
+
+
+def steam_shortcuts() -> dict[str, str]:
+    """AppId (uint32, como aparece no 'SteamLaunch AppId=') -> nome dos atalhos de jogos não-Steam."""
+    global _shortcuts_cache
+    files = []
+    for root in STEAM_ROOTS:
+        files += sorted((root / "userdata").glob("*/config/shortcuts.vdf"))
+    stamp = []
+    for f in files:
+        try:
+            stamp.append((str(f), f.stat().st_mtime))
+        except OSError:
+            pass
+    stamp = tuple(stamp)
+    if stamp == _shortcuts_cache[0]:
+        return _shortcuts_cache[1]
+    out: dict[str, str] = {}
+    for path, _ in stamp:
+        try:
+            data, _ = parse_binary_vdf(Path(path).read_bytes()[:4 * 1024 * 1024])
+        except (OSError, ValueError, IndexError):
+            continue
+        for entry in (data.get("shortcuts") or {}).values():
+            if isinstance(entry, dict) and isinstance(entry.get("appid"), int) and entry.get("appname"):
+                out[str(entry["appid"] & 0xFFFFFFFF)] = str(entry["appname"])[:80]
+    _shortcuts_cache = (stamp, out)
+    return out
+
+
+def parse_binary_vdf(d: bytes, i: int = 0, depth: int = 0) -> tuple[dict, int]:
+    """VDF binário da Steam (shortcuts.vdf). Chaves em minúsculas."""
+    if depth > 16:
+        raise ValueError("VDF aninhado demais")
+    out: dict = {}
+    while i < len(d):
+        t = d[i]
+        i += 1
+        if t == 8:
+            return out, i
+        j = d.index(b"\0", i)
+        key = d[i:j].decode(errors="replace").lower()
+        i = j + 1
+        if t == 0:
+            out[key], i = parse_binary_vdf(d, i, depth + 1)
+        elif t == 1:
+            j = d.index(b"\0", i)
+            out[key] = d[i:j].decode(errors="replace")
+            i = j + 1
+        elif t in (2, 3, 4, 6):
+            out[key] = int.from_bytes(d[i:i + 4], "little")
+            i += 4
+        elif t == 7:
+            out[key] = int.from_bytes(d[i:i + 8], "little")
+            i += 8
+        else:
+            raise ValueError(f"tipo VDF desconhecido: {t}")
+    return out, i
 
 
 def steam_name(appid: str) -> str | None:

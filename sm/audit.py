@@ -254,6 +254,9 @@ DESCRIBERS = {
     "exited_clear": lambda r, b, p: ("panel", "Limpar o histórico de processos encerrados", None),
     "net_clear": lambda r, b, p: ("panel", "Limpar o histórico de conexões encerradas", None),
     "alerts_config_set": lambda r, b, p: ("panel", "Alterar as regras/canais de alertas", None),
+    "mangohud_update": lambda r, b, p: ("game", (f"Editar o arquivo {b.get('file') or 'MangoHud.conf'} do MangoHud" if "text" in b else
+                                                  "MangoHud: " + ", ".join(f"{k}={v}" for k, v in list((b.get("set") or {}).items())[:6])),
+                                        f"mangohud:{b.get('file')}:{','.join(sorted(b.get('set') or {}))}"),
     "game_not_game": lambda r, b, p: ("game", f"{'Marcar' if b.get('ignored', True) is not False else 'Desmarcar'} {b.get('name') or b.get('key')} como app que não é jogo", None),
     "mural_set": lambda r, b, p: ("panel", "Alterar as preferências do Mural", "mural"),
     "mural_background_set": lambda r, b, p: ("panel", "Enviar a imagem de fundo do Mural", "mural"),
