@@ -47,6 +47,13 @@ O projeto é feito e testado no **[CachyOS](https://cachyos.org) com KDE Plasma 
 - **Sensores**: todos os sensores hwmon (temperaturas, ventoinhas, tensões), agrupados por chip.
 - **Ventoinha**: controle da ventoinha por PWM: **automático** (curva temperatura × velocidade editável,
   com perfis prontos), **manual** (velocidade fixa) ou **placa** (devolve o controle ao firmware).
+- **Incidentes**: o painel lê o log do sistema o tempo todo e abre um incidente quando a GPU trava/reinicia, um programa ou
+  serviço cai, a memória acaba, o disco dá erro ou o PC desliga sem aviso. Cada um traz linha do tempo, métricas em volta,
+  processos, mudanças recentes (pacotes, hardware, ações do painel), hipóteses por regras (sem IA) e um texto pronto para colar
+  numa IA. Também investiga qualquer momento escolhido.
+- **Serviços**: unidades do systemd (sistema e do usuário) com estado, memória, CPU, tarefas e reinícios ao vivo; logs e
+  iniciar/parar/reiniciar.
+- **Logs**: busca no journal (texto/regex, prioridade, unidade, kernel, boots anteriores), ao vivo e "investigar este momento".
 - **Sistema**: informações do host e do próprio monitor; **desligar/reiniciar** a máquina (com confirmação e opção de forçar);
   **quem está acessando** o painel (aparelho, IP, nome na rede, MAC, encerrar sessões, histórico de acessos) e
   **ações feitas pelo painel** (quem fez o quê, quando e se deu certo).
@@ -110,6 +117,30 @@ e dos scripts a cada push. Veja **Estrutura e como estender** abaixo e registre 
 - Rodando como usuário comum, só processos desse usuário podem ser finalizados.
 - `security.allow_kill = false` em `config.toml` desliga a função.
 - Não exponha a porta para a internet: o tráfego é HTTP sem criptografia (feito para a LAN).
+
+## Incidentes, serviços e logs
+
+O painel mantém um banco SQLite em `data/store.db` (configuração `[history]`):
+
+- **Vigia do journal**: acompanha `journalctl -f` (avisos e piores + tudo do kernel), retomando do último cursor depois de
+  reinícios; na primeira vez lê as últimas 24 h. As regras ficam em `sm/rules.py` (GPU travou/reiniciou, page fault da GPU,
+  core dump, OOM, serviço que falhou, erro de disco, MCE/PCIe, falha do kernel, temperatura crítica). Avisos dos primeiros
+  2 minutos do boot não abrem incidente (drivers iniciando costumam reclamar).
+- **Investigador** (`sm/incidents.py`): gatilhos a menos de 2 min entram no mesmo incidente (ex.: GPU travou e o jogo caiu 3 s
+  depois); o mesmo programa caindo de novo em 15 min vira repetição. O relatório junta a janela de 5 min antes até 1 min
+  depois: eventos, ações feitas pelo painel, arquivos de overlay alterados, pacotes atualizados (`/var/log/pacman.log`),
+  métricas (1 s ao vivo ou o resumo por minuto), processos no momento, a pilha do core dump e as hipóteses com evidências.
+  "Copiar para IA" gera um Markdown com tudo isso.
+- **Boot anterior**: na partida, se o boot anterior terminou sem as mensagens de desligamento, abre "Desligamento inesperado".
+- **Métricas**: cada série do painel é resumida por minuto (mín/méd/máx) e por hora (`GET /api/history/metrics`).
+- **Hardware**: placa, BIOS, CPU (microcode), GPU (VBIOS), memória, discos, kernel e versões (Mesa, firmware, Proton...) são
+  gravados quando mudam (`GET /api/history/hardware`), com a lista do que mudou.
+- **Permissão**: para ler o journal do sistema, o usuário do serviço precisa estar no grupo `wheel`, `adm` ou `systemd-journal`
+  (no Arch/CachyOS o primeiro usuário já está no `wheel`). Sem isso, só aparecem os logs do próprio usuário.
+- **Serviços do sistema**: iniciar/parar pedem o polkit; sem uma regra para o usuário do painel o sistema recusa (os do
+  usuário funcionam direto). Parar o próprio painel pelo painel é bloqueado.
+
+Vários computadores: veja [FROTA.md](FROTA.md).
 
 ## Histórico e análise de processos
 

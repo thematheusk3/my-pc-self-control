@@ -33,6 +33,7 @@ RULES = {
     "panel_login": ("Novo acesso ao painel", True, None, None, "Alguém entrou no painel com a senha"),
     "login_fail": ("Tentativas de senha erradas", True, None, None, "Um IP foi bloqueado por errar a senha várias vezes"),
     "updates":    ("Atualizações disponíveis", False, None, None, "Quando aparecem atualizações novas"),
+    "incident":   ("Incidente detectado", True, None, None, "GPU travou, programa ou serviço caiu, memória esgotada, erro de disco..."),
     "low_fps":    ("FPS baixo no jogo", False, 30, "FPS", "FPS médio abaixo do limite por 20 s (precisa da leitura de FPS)"),
 }
 COOLDOWN = 30 * 60   # a mesma condição contínua só alerta de novo depois disso

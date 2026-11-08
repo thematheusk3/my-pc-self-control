@@ -39,6 +39,11 @@ class Context:
         self.power_timer = None # PowerTimer
         self.media = None       # Media (MPRIS), criado pelo coletor "media"
         self.focus = None       # FocusMonitor, criado pelo coletor "focus"
+        self.store = None       # Store (data/store.db)
+        self.journal = None     # JournalWatcher
+        self.investigator = None  # Investigator (incidentes)
+        self.hwinv = None       # HardwareInventory
+        self.recorder = None    # MetricsRecorder
 
     def snapshot(self) -> dict:
         return {"ts": self.ts, "seq": self.seq, "series": dict(self.history.latest), "data": self.data}

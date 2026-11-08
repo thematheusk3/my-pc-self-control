@@ -31,5 +31,14 @@ class Gpu(Collector):
             s["engines"] = {**fd_engines.get(s.get("id"), {}), **(s.get("engines") or {})}   # NVML tem prioridade
             self.record(f"gpu.{i}.busy", s.get("busy"))
             self.record(f"gpu.{i}.temp", s.get("temp"))
+            for name in ("vram", "gtt"):          # % da memória da GPU (vazamento/estouro aparece nos incidentes)
+                m = s.get(name) or {}
+                if m.get("total"):
+                    self.record(f"gpu.{i}.{name}", 100 * m["used"] / m["total"])
+            if isinstance(s.get("power"), (int, float)):
+                self.record(f"gpu.{i}.power", s["power"])
+            clk = (s.get("clocks") or {}).get("sclk") or (s.get("clocks") or {}).get("core") or s.get("freq")
+            if isinstance(clk, (int, float)):
+                self.record(f"gpu.{i}.clock", clk)
             out.append(s)
         return {"gpus": out}

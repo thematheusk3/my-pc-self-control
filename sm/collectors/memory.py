@@ -14,6 +14,8 @@ class Memory(Collector):
         v = psutil.virtual_memory()
         s = psutil.swap_memory()
         self.record("memory.percent", v.percent)
+        if s.total:
+            self.record("memory.swap", s.percent)
         return {
             "total": v.total, "used": v.total - v.available, "available": v.available,
             "percent": v.percent, "cached": getattr(v, "cached", 0), "buffers": getattr(v, "buffers", 0),

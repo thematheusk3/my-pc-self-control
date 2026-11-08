@@ -24,6 +24,8 @@ allow_unlock = true # permite bloquear/desbloquear a sessão (tela de bloqueio) 
 allow_launch = true # permite abrir aplicativos instalados pelo painel
 allow_screenshot = true # captura de tela pelo painel (sempre mostra um aviso na tela do PC)
 allow_control = true    # controle de áudio e tela (saída, volume, microfone, resolução, brilho)
+allow_services = true   # iniciar/parar/reiniciar serviços (os do sistema ainda dependem do polkit)
+allow_logs = true       # aba Logs: lê o journal inteiro do sistema
 # senha: defina com  python3 server.py --set-password  (fica em data/auth.json, só o hash)
 
 [collectors]
@@ -49,3 +51,9 @@ on_exit = "firmware"      # ao parar o serviço: firmware (devolve à placa) | f
 # Não baixa nem instala nada. Com false, mostra só o changelog desta versão.
 check = true
 repo = "thematheusk3/my-pc-self-control"
+
+[history]
+# Banco data/store.db: eventos do journal classificados, incidentes, métricas por minuto/hora e inventário de hardware.
+enabled = true
+days = 30            # eventos e métricas por minuto ficam N dias; o resumo por hora fica 1 ano; incidentes ficam
+incidents = true     # vigia do journal + investigador de incidentes (aba Incidentes)

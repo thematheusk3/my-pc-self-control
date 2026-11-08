@@ -48,6 +48,12 @@ class Config:
     # aviso de versão nova (consulta o GitHub; não instala nada)
     update_check: bool = True
     update_repo: str = "thematheusk3/my-pc-self-control"
+    # histórico persistente, incidentes, serviços e logs
+    history_enabled: bool = True         # banco data/store.db: eventos, incidentes, métricas, hardware
+    history_days: int = 30               # retenção de eventos e métricas por minuto (por hora: 1 ano)
+    incidents: bool = True               # vigia do journal + investigador de incidentes
+    allow_services: bool = True          # iniciar/parar/reiniciar serviços pelo painel (os do sistema dependem do polkit)
+    allow_logs: bool = True              # aba Logs (lê o journal inteiro do sistema)
 
 
 def load(path: Path | None = None) -> Config:
@@ -62,6 +68,7 @@ def load(path: Path | None = None) -> Config:
     collectors = raw.get("collectors", {})
     fan = raw.get("fan", {})
     update = raw.get("update", {})
+    history = raw.get("history", {})
     repo = str(update.get("repo", Config.update_repo))
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
         raise ValueError(f'[update] repo inválido: "{repo}" (use o formato dono/repositorio)')
@@ -99,5 +106,10 @@ def load(path: Path | None = None) -> Config:
         fan_on_exit=fan.get("on_exit", Config.fan_on_exit) if fan.get("on_exit") in ("firmware", "full", "keep") else Config.fan_on_exit,
         update_check=bool(update.get("check", True)),
         update_repo=repo,
+        history_enabled=bool(history.get("enabled", True)),
+        history_days=max(1, min(3650, int(history.get("days", Config.history_days)))),
+        incidents=bool(history.get("incidents", True)),
+        allow_services=bool(security.get("allow_services", True)),
+        allow_logs=bool(security.get("allow_logs", True)),
     )
     return cfg

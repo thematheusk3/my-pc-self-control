@@ -391,8 +391,28 @@ def steam_shortcuts() -> dict[str, str]:
             continue
         for entry in (data.get("shortcuts") or {}).values():
             if isinstance(entry, dict) and isinstance(entry.get("appid"), int) and entry.get("appname"):
-                out[str(entry["appid"] & 0xFFFFFFFF)] = str(entry["appname"])[:80]
+                aid = str(entry["appid"] & 0xFFFFFFFF)
+                out[aid] = str(entry["appname"])[:80]
+                _shortcut_exes[aid] = str(entry.get("exe") or "").strip('"')[:500]
     _shortcuts_cache = (stamp, out)
+    return out
+
+
+_shortcut_exes: dict[str, str] = {}
+
+
+def steam_shortcut(appid: str) -> dict | None:
+    """Atalho não-Steam: {name, exe, game_appid?, game?}. game = jogo instalado em cuja pasta o exe está."""
+    name = steam_shortcuts().get(appid)
+    if not name:
+        return None
+    exe = _shortcut_exes.get(appid, "")
+    out = {"name": name, "exe": exe}
+    for folder in reversed(RX_COMMON.findall(exe.replace("\\", "/"))):
+        real = _installdir_appid(folder)
+        if real:
+            out["game_appid"], out["game"] = real, steam_name(real) or folder
+            break
     return out
 
 

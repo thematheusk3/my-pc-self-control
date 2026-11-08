@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0 — 2026-11-08
+- **Incidentes**: vigia do journal (avisos e piores + kernel, retomando do último cursor) com regras para GPU travada/reiniciada,
+  page fault da GPU, core dump, OOM, serviço que falhou, erro de disco, MCE/PCIe, falha do kernel e temperatura crítica.
+  Gatilhos próximos viram um incidente só; o relatório traz linha do tempo (eventos, ações do painel, arquivos de overlay
+  alterados, pacotes), métricas antes/no momento/pico, processos e jogo no momento, pilha do core dump, mudanças recentes de
+  software e hardware, hipóteses com confiança e evidências (por regras, sem IA) e "Copiar para IA" (Markdown). Também detecta
+  desligamento inesperado do boot anterior e investiga qualquer momento escolhido. Alerta "Incidente detectado".
+- **Serviços**: unidades do systemd do sistema e do usuário com estado, memória, CPU, tarefas e reinícios ao vivo; detalhes,
+  últimas linhas do log, iniciar/parar/reiniciar (`security.allow_services`; os do sistema dependem do polkit).
+- **Logs**: busca no journal por texto/regex, prioridade, unidade, kernel e boot (inclusive anteriores), ao vivo, "ver ao redor"
+  e "investigar este momento" (`security.allow_logs`).
+- **Histórico persistente** (`data/store.db`, `[history]`): eventos classificados, incidentes, métricas por minuto e por hora
+  (`/api/history/metrics`) e inventário de hardware/software gravado quando muda (`/api/history/hardware`).
+- **Preparação para vários computadores**: identidade estável da máquina e pacote de envio por `seq`
+  (`/api/fleet`, `/api/fleet/export`); desenho do servidor central em [FROTA.md](FROTA.md).
+- Novas séries no histórico: memória da GPU (VRAM/GTT em %), consumo e clock da GPU (quando o driver informa) e swap.
+
 ## 0.5.2 — 2026-11-08
 - Jogo atual: corrigido o "App 35931" de atalhos não-Steam. O comando dos processos vem cortado em 300 caracteres e o corte
   partia o AppId ao meio; agora o AppId é lido do `/proc/<pid>/cmdline` completo.

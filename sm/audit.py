@@ -25,7 +25,8 @@ MERGE_WINDOW = 20      # s: ajustes seguidos do mesmo controle viram uma entrada
 SAVE_DELAY = 2         # s: agrupa gravações em disco (sliders mandam vários pedidos por segundo)
 CATEGORIES = {"process": "Processos", "power": "Energia", "fan": "Ventoinha", "session": "Sessão do PC", "apps": "Apps",
               "audio": "Áudio", "media": "Mídia", "display": "Tela", "screenshot": "Captura de tela",
-              "game": "Jogo/FPS", "panel": "Painel"}
+              "game": "Jogo/FPS", "service": "Serviços", "incident": "Incidentes",
+              "panel": "Painel"}
 
 
 class Audit:
@@ -254,6 +255,12 @@ DESCRIBERS = {
     "exited_clear": lambda r, b, p: ("panel", "Limpar o histórico de processos encerrados", None),
     "net_clear": lambda r, b, p: ("panel", "Limpar o histórico de conexões encerradas", None),
     "alerts_config_set": lambda r, b, p: ("panel", "Alterar as regras/canais de alertas", None),
+    "service_action": lambda r, b, p: ("service", f"{ {'start': 'Iniciar', 'stop': 'Parar', 'restart': 'Reiniciar', 'reload': 'Recarregar'}.get(p.get('act'), p.get('act')) } o serviço {p.get('unit')}"
+                                       + (" (do usuário)" if (b.get("scope") == "user") else ""), None),
+    "incident_update": lambda r, b, p: ("incident", f"Incidente {p.get('iid')}: " + ", ".join(
+        x for x in ((f"marcar como {b['status']}" if b.get("status") else None), ("editar observação" if "note" in b else None)) if x), None),
+    "incident_delete": lambda r, b, p: ("incident", f"Apagar o incidente {p.get('iid')}", None),
+    "incident_investigate": lambda r, b, p: ("incident", "Pedir investigação manual", None),
     "mangohud_update": lambda r, b, p: ("game", (f"Editar o arquivo {b.get('file') or 'MangoHud.conf'} do MangoHud" if "text" in b else
                                                   "MangoHud: " + ", ".join(f"{k}={v}" for k, v in list((b.get("set") or {}).items())[:6])),
                                         f"mangohud:{b.get('file')}:{','.join(sorted(b.get('set') or {}))}"),

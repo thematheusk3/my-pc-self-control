@@ -46,6 +46,31 @@ def set_password() -> None:
     print("Se o serviço estiver rodando, reinicie-o: sudo systemctl restart self-monitoring")
 
 
+def start_history(ctx, cfg) -> None:
+    """Banco persistente + inventário de hardware + métricas por minuto + vigia do journal/incidentes."""
+    log = logging.getLogger("self-monitoring")
+    from sm import fleet
+    from sm.hwinfo import HardwareInventory
+    from sm.recorder import MetricsRecorder
+    from sm.store import Store
+    try:
+        ctx.store = Store(fleet.machine_id())
+    except Exception:  # noqa: BLE001
+        log.exception("banco de histórico indisponível; recursos de histórico desativados")
+        return
+    ctx.hwinv = HardwareInventory(ctx.store)
+    ctx.hwinv.start()
+    ctx.recorder = MetricsRecorder(ctx, ctx.store, cfg.history_days)
+    ctx.recorder.start()
+    if cfg.incidents:
+        from sm.incidents import Investigator
+        from sm.journal import JournalWatcher
+        ctx.investigator = Investigator(ctx, ctx.store)
+        ctx.investigator.start()
+        ctx.journal = JournalWatcher(ctx.store, ctx.investigator.on_event)
+        ctx.journal.start()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="self-monitoring")
     ap.add_argument("--host")
@@ -95,6 +120,8 @@ def main() -> None:
     ctx.alerts = Alerts(ctx)
     ctx.alerts.start()
     ctx.webhook = Webhook(ctx.alerts)
+    if cfg.history_enabled:
+        start_history(ctx, cfg)
     Sampler(ctx).start()
     srv = make_server(ctx)
 
@@ -124,6 +151,9 @@ def main() -> None:
             ctx.netmon.stop()
         if ctx.focus:
             ctx.focus.stop()
+        for comp in (ctx.journal, ctx.investigator, ctx.hwinv, ctx.recorder):
+            if comp:
+                comp.stop()
         srv.server_close()
 
 
