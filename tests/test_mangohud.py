@@ -122,6 +122,19 @@ class ShortcutTest(unittest.TestCase):
         self.assertEqual(game.resolve_launch("4000000000", None, 3, "reaper SteamLaunch AppId=4000000000 -- /opt/Jogo/MeuJogo.exe"),
                          (None, "MeuJogo", "MeuJogo"))
 
+    def test_truncated_cmd_reads_full_appid(self):
+        from types import SimpleNamespace
+        orig = game._full_cmdline
+        game._full_cmdline = lambda pid: "reaper SteamLaunch AppId=3593100922 -- /s/steamapps/common/ELDEN RING/Game/x.exe"
+        try:
+            ctx = SimpleNamespace(processes=[{"pid": 5, "create_time": 1, "cmd": "x" * 270 + " SteamLaunch AppId=35931"}])
+            mon = game.GameMonitor.__new__(game.GameMonitor)
+            mon.ctx = ctx
+            g = mon.running_game()
+        finally:
+            game._full_cmdline = orig
+        self.assertEqual((g["appid"], g["name"]), ("1245620", "ELDEN RING"))
+
     def test_regular_game(self):
         self.assertEqual(game.resolve_launch("1245620", None, 4, ""), ("1245620", "ELDEN RING", None))
 

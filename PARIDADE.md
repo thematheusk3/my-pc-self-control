@@ -10,7 +10,7 @@ backend de cada sistema.
 **Regra:** ao implementar algo novo em uma versão, registre aqui se dá para levar para a outra (e como), ou se é
 impossível (e por quê). Quando for portado, mova a linha para "Já equalizado" e anote a versão.
 
-Situação em: versão Linux 0.5.0, versão Windows 0.11.1-win.
+Situação em: versão Linux 0.5.2, versão Windows 0.11.1-win.
 
 ## 1. Só no Windows: dá para levar ao Linux
 
@@ -33,6 +33,8 @@ Cuidados ao mexer no frontend, que custaram retrabalho no Windows e valem nos do
 
 | Recurso | Como é no Linux | Como fazer no Windows | Esforço |
 |---|---|---|---|
+| **Nome de jogos não-Steam adicionados à Steam** (0.5.1–0.5.2), ex.: launcher do Seamless Coop do Elden Ring | O AppId do atalho é um número ≥ 2³¹ sem manifest. O painel lê o comando **completo** do processo (o da lista vem cortado e partia o AppId); se o `.exe` está em `steamapps/common/<pasta>` de um jogo instalado, vira esse jogo (nome e arte); senão usa o nome do atalho em `userdata/*/config/shortcuts.vdf` (VDF binário, `parse_binary_vdf` em `game.py`) | Os atalhos ficam no mesmo `shortcuts.vdf` (`C:\Program Files (x86)\Steam\userdata\...`) e o parser é o mesmo. Conferir como o Windows descobre o jogo atual: se for pelo processo com o `.exe` em `steamapps\common\<pasta>`, mapear a pasta para o `installdir` dos `appmanifest_*.acf`; se usar o AppId, aplicar a mesma regra do bit alto | Baixo |
+| **Aba MangoHud: configurar o HUD do jogo ao vivo** (0.5.1–0.5.2) | `sm/mangohud.py` + `mangohud.js`: edita o `MangoHud.conf` (o mesmo do GOverlay; o MangoHud recarrega ao mudar o arquivo): posição, aparência, métricas, limite de FPS, atalhos, editor do arquivo, configs por jogo. Linhas `exec` bloqueadas. O GOverlay reescreve o arquivo inteiro ao abrir/salvar: a aba avisa quando ele está aberto e o `game.py` recoloca o bloco da leitura de FPS | **A avaliar.** Não há MangoHud no Windows; o equivalente é o RivaTuner (RTSS), que guarda as opções em `Profiles\Global` (INI) e talvez não releia o arquivo com o jogo aberto. Ver se o RTSS aplica mudanças ao vivo (ou pela API de memória compartilhada) antes de começar; se não der, registrar na seção 3 | Alto (talvez impossível) |
 | **Aviso "precisa reiniciar"** no cartão de atualizações (0.4.7) | `GET /api/updates` devolve `reboot: {reason, running, installed}` ou `null`; o `system.js` mostra uma faixa no topo do cartão | O Windows já sabe (`RebootRequired` do Windows Update); devolver `reboot` como objeto (`{"reason": "sistema"}`), somando as chaves `...\Component Based Servicing\RebootPending` e `...\WindowsUpdate\Auto Update\RebootRequired` do registro, e copiar o trecho do `system.js` (hoje o Windows só cita o reinício dentro do aviso de pacotes sensíveis) | Baixo |
 | **Uso da GPU por engine na Visão geral** (0.4.7) | `gpu.engines` (fdinfo/NVML) exibido como "Por engine: 3D 42% · Vídeo cod. 3%" | O backend do Windows **já devolve** `engines` (contadores "GPU Engine"); só copiar `ENGINE`/`enginesText` do `overview.js` (os nomes do Windows, `3D`, `Copy`, `VideoDecode`..., já estão no mapa) | Baixo |
 | **Frontend: erro da API com dados** (0.4.7) | `app.api` anexa `status` e `data` ao erro; o `procsheet.js` usa `e.data.critical` para pedir confirmação de processo essencial aberto de uma lista sem a marca | Não muda nada no Windows (lá processo crítico é bloqueado com 403, ver seção 3), mas mantém os arquivos parecidos | Baixo |

@@ -33,6 +33,7 @@ BEGIN, END = "# >>> self-monitoring: leitura de FPS no painel", "# <<< self-moni
 ACTIVE_WINDOW = 5.0     # s sem escrever no CSV = jogo fechado/log parado
 WINDOW_1PCT = 60.0      # s usados para o 1% low
 MAX_NOT_GAMES = 200
+CONF_CHECK = 10.0       # s entre verificações do MangoHud.conf (bloco do painel apagado por outro programa)
 MAX_RECENT = 8          # jogos vistos há pouco, para escolher o que não é jogo
 RX_KEY = re.compile(r"(steam:\d{1,12}|exe:[a-z0-9._-]{1,80})")
 
@@ -99,6 +100,7 @@ class GameMonitor:
         self.samples: deque = deque()      # (t, fps, frametime)
         self.last: dict = {}
         self.last_write = 0.0
+        self._conf_check = 0.0
 
     # ---------- ligar/desligar ----------
     def _load(self) -> dict:
@@ -161,7 +163,10 @@ class GameMonitor:
         """Jogo da Steam em execução (processo 'reaper SteamLaunch AppId=N')."""
         for p in self.ctx.processes or []:
             cmd = p.get("cmd") or ""
-            m = re.search(r"SteamLaunch AppId=(\d+)", cmd)
+            if "SteamLaunch AppId=" not in cmd:
+                continue
+            # o cmd da lista de processos é cortado em 300 caracteres e pode partir o AppId ao meio
+            m = re.search(r"SteamLaunch AppId=(\d+)", _full_cmdline(p.get("pid")) or cmd)
             if m and m.group(1) != "0":
                 appid, name, exe = resolve_launch(m.group(1), p.get("pid"), p.get("create_time"), cmd)
                 game = {"appid": appid, "name": name, "since": p.get("create_time"), "source": "steam", "pid": p.get("pid")}
@@ -185,6 +190,16 @@ class GameMonitor:
     def tick(self) -> None:
         if not self.enabled:
             return
+        now = time.time()
+        if now - self._conf_check > CONF_CHECK:
+            # o GOverlay reescreve o MangoHud.conf inteiro ao abrir/salvar e apaga o bloco do painel
+            self._conf_check = now
+            if not self.config_ok():
+                try:
+                    self.set_enabled(True)
+                    log.info("bloco da leitura de FPS recolocado no MangoHud.conf (o arquivo foi reescrito)")
+                except RuntimeError as e:
+                    log.warning("%s", e)
         f = self._newest_log()
         now = time.time()
         with self.lock:

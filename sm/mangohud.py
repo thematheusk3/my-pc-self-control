@@ -48,6 +48,18 @@ def version() -> str | None:
     return _version or None
 
 
+def goverlay_running() -> bool:
+    from pathlib import Path
+    for d in Path("/proc").iterdir():
+        if d.name.isdigit():
+            try:
+                if (d / "comm").read_text().strip() == "goverlay":
+                    return True
+            except OSError:
+                pass
+    return False
+
+
 def _path(name: str | None):
     name = name or MANGO_CONF.name
     if not RX_FILE.fullmatch(name):
@@ -126,7 +138,7 @@ def state(name: str | None = None) -> dict:
     opts, order = parse(text)
     _, managed = parse(block.replace(BEGIN, "").replace(END, "")) if block else ({}, [])
     return {
-        "installed": installed(), "version": version(), "goverlay": bool(shutil.which("goverlay")),
+        "installed": installed(), "version": version(), "goverlay": bool(shutil.which("goverlay")), "goverlay_running": goverlay_running(),
         "dir": str(CONF_DIR), "file": path.name, "path": str(path), "exists": path.exists(),
         "scope": scope(path.name), "files": files(),
         "options": opts, "order": order, "managed": managed,

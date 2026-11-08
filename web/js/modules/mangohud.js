@@ -58,6 +58,8 @@ function mount(el, a) {
         <label class="check mh-big"><input type="checkbox" data-hide> Esconder o HUD</label>
         <span class="mh-saved" data-saved aria-live="polite"></span>
       </div>
+      <div class="note mh-warn" data-gov hidden><b>O GOverlay está aberto no PC.</b> Ele reescreve o arquivo inteiro quando
+        salva (e às vezes ao abrir), apagando o que foi mudado aqui. Feche o GOverlay para usar esta página.</div>
       <div data-game></div>
       <p class="note">As mudanças vão direto para o arquivo e o MangoHud recarrega sozinho: o HUD do jogo aberto muda em
         um ou dois segundos. Se não mudar, aperte <b>Shift esquerdo + F4</b> no jogo. O GOverlay usa o mesmo arquivo — se você
@@ -205,7 +207,8 @@ function render() {
   if (!st || busy) return;
   const o = st.options, el = root;
   $("[data-sub]", el).textContent = [st.version ? `MangoHud ${st.version}` : null, st.path, st.exists ? null : "arquivo novo"].filter(Boolean).join(" · ");
-  $("[data-act=goverlay]", el).hidden = !(st.goverlay && app.info?.features?.launch);
+  $("[data-act=goverlay]", el).hidden = !(st.goverlay && app.info?.features?.launch) || st.goverlay_running;
+  $("[data-gov]", el).hidden = !st.goverlay_running;
   $("[data-act=undo]", el).disabled = !undo.length;
   const sel = $("[data-file]", el);
   const label = f => f.scope === "global" ? `${f.name} (todos os jogos)` : f.scope === "app" ? `${f.name} (só um jogo)` : f.name;

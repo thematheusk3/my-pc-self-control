@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2
+- Jogo atual: corrigido o "App 35931" de atalhos não-Steam. O comando dos processos vem cortado em 300 caracteres e o corte
+  partia o AppId ao meio; agora o AppId é lido do `/proc/<pid>/cmdline` completo.
+- O GOverlay reescreve o `MangoHud.conf` inteiro ao abrir/salvar e apagava o bloco da leitura de FPS: o painel confere o
+  arquivo a cada 10 s e recoloca o bloco. A aba MangoHud avisa quando o GOverlay está aberto (ele sobrescreve o que for
+  mudado pela página) e esconde o botão de abri-lo.
+
 ## 0.5.1
 - **Aba MangoHud**: ajusta o `MangoHud.conf` (o mesmo arquivo do GOverlay) pelo celular e o HUD do jogo aberto muda na hora
   (o MangoHud recarrega o arquivo sozinho). Posição, fonte, opacidade, cores, colunas, métricas, limite de FPS, VSync,

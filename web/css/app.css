@@ -636,3 +636,4 @@ body.login-page { display: grid; place-items: center; min-height: 100dvh; paddin
 .mh-group legend { font-size: 12px; font-weight: 650; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; padding: 0; }
 .mh-text { width: 100%; box-sizing: border-box; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-primary);
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-m); padding: 10px; resize: vertical; min-height: 220px; }
+.mh-warn { color: var(--text-secondary); border-left: 3px solid var(--warning); padding-left: 10px; }
