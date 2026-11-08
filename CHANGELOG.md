@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2 — 2026-11-08
+- Sensores/Ventoinha: a dica de "nenhuma ventoinha" mandava a BC-250 (ASRock) carregar o `nct6775`, que não atende o chip
+  dela. Agora reconhece a BC-250 (Nuvoton NCT6686D → driver `nct6687`), diz se o módulo existe para o kernel em uso ou se
+  falta o `nct6687d-dkms-git`, e dá o comando pronto para carregar no boot (`/etc/modules-load.d/nct6687.conf`).
+
 ## 0.6.1 — 2026-11-08
 - Sistema > Sessão: "Desbloquear" não ativava logo depois de ligar o PC com "entrar pelo celular". Com o bloqueio ao iniciar
   (`LockOnStart`) o KDE bloqueia a tela sem avisar o logind (`LockedHint=no`), e o painel achava que a sessão estava
