@@ -102,8 +102,9 @@ async function refreshSession() {
       <dl class="kv" style="margin-bottom:12px"><dt>Usuário</dt><dd>${esc(st.user)}</dd><dt>Sessão</dt><dd>${esc(s.desktop || "")} · ${esc(s.type)}</dd></dl>
       <div class="power-btns">
         <button class="btn" data-sess="lock" ${s.locked ? "disabled" : ""}>${ic("lock")} Bloquear</button>
-        <button class="btn btn-primary" data-sess="unlock" ${s.locked ? "" : "disabled"}>${ic("lock-open")} Desbloquear</button>
-      </div>`
+        <button class="btn ${s.locked ? "btn-primary" : ""}" data-sess="unlock">${ic("lock-open")} Desbloquear</button>
+      </div>
+      ${s.locked ? "" : `<p class="note" style="margin-top:8px">Se a tela do PC estiver bloqueada mas aparecer como desbloqueada aqui, toque em Desbloquear mesmo assim.</p>`}`
     : st.other_users?.length
     ? `<p class="confirm-text" style="margin-top:0"><b>${ic("warning")} Há uma sessão aberta de ${esc(st.other_users.join(", "))}, mas o painel está ligado à conta ${esc(st.user)}${st.service_user !== st.user ? ` (serviço rodando como ${esc(st.service_user)})` : ""}.</b>
        Áudio, tela, captura e apps não funcionam assim. Reinstale a partir da conta certa: <code>sudo ./install.sh --user ${esc(st.other_users[0])}</code></p>`

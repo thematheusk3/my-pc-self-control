@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 — 2026-11-08
+- Sistema > Sessão: "Desbloquear" não ativava logo depois de ligar o PC com "entrar pelo celular". Com o bloqueio ao iniciar
+  (`LockOnStart`) o KDE bloqueia a tela sem avisar o logind (`LockedHint=no`), e o painel achava que a sessão estava
+  desbloqueada. Agora o estado também vem do bloqueador do KDE (`org.freedesktop.ScreenSaver.GetActive`) e o botão
+  Desbloquear fica sempre disponível quando há sessão.
+
 ## 0.6.0 — 2026-11-08
 - **Incidentes**: vigia do journal (avisos e piores + kernel, retomando do último cursor) com regras para GPU travada/reiniciada,
   page fault da GPU, core dump, OOM, serviço que falhou, erro de disco, MCE/PCIe, falha do kernel e temperatura crítica.

@@ -174,7 +174,27 @@ def graphical_session(uid: int | None = None) -> dict | None:
                 "since": props.get("Timestamp") or None}
         if best is None or (cand["active"] and not best["active"]):
             best = cand
+    if best and uid == UID:
+        # Com "bloquear ao iniciar" (LockOnStart) o KDE bloqueia antes de avisar o logind, e o LockedHint
+        # fica "no" com a tela bloqueada. O bloqueador responde pelo D-Bus da sessão: vale o que disser "bloqueada".
+        saver = screensaver_active()
+        best["locked_hint"] = best["locked"]
+        best["screensaver"] = saver
+        best["locked"] = best["locked"] or bool(saver)
     return best
+
+
+def screensaver_active() -> bool | None:
+    """org.freedesktop.ScreenSaver.GetActive na sessão do usuário (KDE: tela de bloqueio ativa). None = sem resposta."""
+    try:
+        r = _run(["busctl", "--user", "call", "org.freedesktop.ScreenSaver", "/ScreenSaver",
+                  "org.freedesktop.ScreenSaver", "GetActive"], timeout=3, env=user_env())
+    except (OSError, subprocess.SubprocessError):
+        return None
+    out = r.stdout.strip()
+    if r.returncode or not out.startswith("b "):
+        return None
+    return out == "b true"
 
 
 def other_desktop_users() -> list[str]:
@@ -223,7 +243,8 @@ def set_locked(lock: bool) -> dict:
     r = _run(["loginctl", "lock-session" if lock else "unlock-session", s["id"]])
     if r.returncode:
         raise SessionError(f"O logind recusou: {r.stderr.strip() or r.returncode}", 500)
-    # o bloqueador leva um instante para atualizar o LockedHint
+    # o bloqueador leva um instante para atualizar o LockedHint (o desbloqueio vale mesmo se o painel
+    # não tinha percebido o bloqueio: com LockOnStart o LockedHint pode estar errado)
     for _ in range(10):
         time.sleep(0.3)
         cur = graphical_session()

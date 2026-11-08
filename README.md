@@ -208,6 +208,8 @@ O gerenciador de login (plasmalogin/SDDM) não tem API para login remoto. A solu
    O script ativa primeiro o bloqueio ao iniciar e só então o login automático, e faz backup de `/etc/plasmalogin.conf`.
 2. **Desbloquear pelo painel**: *Sistema > Sessão > Desbloquear* pede a **senha do painel** e manda o
    `systemd-logind` desbloquear a sessão (`loginctl unlock-session`). Também dá para **bloquear** remotamente.
+   O estado "bloqueada" vem do logind e do bloqueador do KDE (D-Bus `org.freedesktop.ScreenSaver`): com o bloqueio ao
+   iniciar, o KDE bloqueia sem avisar o logind. O botão Desbloquear fica disponível sempre que há sessão.
 
 Por que a senha do painel e não a do Linux: o painel é HTTP sem criptografia na rede local, e a senha do Linux
 costuma ser também a do `sudo`. O desbloqueio tem o mesmo limite de tentativas do login.

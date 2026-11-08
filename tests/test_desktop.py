@@ -71,3 +71,39 @@ class RootServiceTest(unittest.TestCase):
                              ["setpriv", "--reuid=1000", "--regid=1000", "--init-groups"])
         with mock.patch.object(desktop, "SERVICE_UID", 1000), mock.patch.object(desktop, "UID", 1000):
             self.assertEqual(desktop.as_user(["pactl", "info"]), ["pactl", "info"])
+
+
+class LockOnStartTest(unittest.TestCase):
+    """Com LockOnStart o KDE bloqueia sem avisar o logind (LockedHint=no): vale o bloqueador do KDE."""
+
+    def setUp(self):
+        from sm import desktop
+        self.d = desktop
+        self.orig = (desktop.list_sessions, desktop._run)
+        desktop.list_sessions = lambda: [{"session": "1", "uid": desktop.UID, "user": "u"}]
+        self.saver = "b true"
+
+        def fake_run(cmd, timeout=10, env=None):
+            from types import SimpleNamespace
+            if "show-session" in cmd:
+                return SimpleNamespace(returncode=0, stderr="", stdout="Type=wayland\nClass=user\nActive=yes\nLockedHint=no\n")
+            if "GetActive" in cmd:
+                return SimpleNamespace(returncode=0, stderr="", stdout=self.saver + "\n")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        desktop._run = fake_run
+
+    def tearDown(self):
+        self.d.list_sessions, self.d._run = self.orig
+
+    def test_screensaver_wins(self):
+        s = self.d.graphical_session()
+        self.assertTrue(s["locked"])
+        self.assertFalse(s["locked_hint"])
+
+    def test_unlocked_and_no_answer(self):
+        self.saver = "b false"
+        self.assertFalse(self.d.graphical_session()["locked"])
+        self.saver = ""
+        s = self.d.graphical_session()
+        self.assertFalse(s["locked"])
+        self.assertIsNone(s["screensaver"])
